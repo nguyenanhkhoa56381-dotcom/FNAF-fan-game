@@ -35,6 +35,9 @@ class Room:
         self.host_token = token
         self.guests = {}
         self.state = None
+        self.chat_messages = []
+        self.next_chat_id = 1
+        self.chat_last_sent = {}
         self.last_activity = time.time()
 
 
@@ -209,6 +212,11 @@ class GameHandler(SimpleHTTPRequestHandler):
                 state = payload.get("state")
                 if isinstance(state, dict):
                     room.state = state
+                host_profile = next(
+                    (player for player in state.get("players", []) if player.get("id") == 1),
+                    {},
+                ) if isinstance(state, dict) else {}
+                self.add_chat_messages(room, 1, host_profile.get("name", "player 1"), payload.get("chatMessages"), now)
                 connected_guests = {
                     player_id: guest for player_id, guest in room.guests.items()
                     if now - guest["last_seen"] <= PLAYER_TIMEOUT
@@ -227,6 +235,7 @@ class GameHandler(SimpleHTTPRequestHandler):
                         for player_id, guest in connected_guests.items()
                     },
                     "inputs": guest_inputs,
+                    "chatMessages": self.chat_messages_after(room, payload.get("chatCursor")),
                 }
             elif role == "guest":
                 try:
@@ -238,6 +247,13 @@ class GameHandler(SimpleHTTPRequestHandler):
                     self.send_json(403, {"error": "Phiên tham gia không hợp lệ."})
                     return
                 guest["last_seen"] = now
+                self.add_chat_messages(
+                    room,
+                    player_id,
+                    guest["profile"]["name"],
+                    payload.get("chatMessages"),
+                    now,
+                )
                 input_state = payload.get("input", {})
                 if isinstance(input_state, dict):
                     guest["profile"] = self.clean_profile(input_state.get("profile"), player_id)
@@ -256,11 +272,47 @@ class GameHandler(SimpleHTTPRequestHandler):
                             or (isinstance(action, str) and action.startswith("memory-") and action[7:].isdigit() and 0 <= int(action[7:]) <= 3)
                             or (isinstance(action, str) and action.startswith("puzzle-tile-") and action[12:].isdigit() and 0 <= int(action[12:]) <= 8)
                         )
-                response = {"state": room.state}
+                response = {
+                    "state": room.state,
+                    "chatMessages": self.chat_messages_after(room, payload.get("chatCursor")),
+                }
             else:
                 self.send_json(403, {"error": "Phiên tham gia không hợp lệ."})
                 return
         self.send_json(200, response)
+
+    @staticmethod
+    def chat_messages_after(room, cursor):
+        try:
+            cursor = max(0, int(cursor))
+        except (TypeError, ValueError):
+            cursor = 0
+        return [message for message in room.chat_messages if message["id"] > cursor]
+
+    @staticmethod
+    def add_chat_messages(room, player_id, player_name, messages, now):
+        if not isinstance(messages, list) or now - room.chat_last_sent.get(player_id, 0) < 0.9:
+            return
+        for raw_message in messages[:1]:
+            if not isinstance(raw_message, str):
+                continue
+            text = "".join(character for character in raw_message if character.isprintable()).strip()[:200]
+            if not text:
+                continue
+            raw_name = player_name if isinstance(player_name, str) else ""
+            name = "".join(character for character in raw_name if character.isprintable()).strip()[:18]
+            name = name or f"player {player_id}"
+            room.chat_messages.append({
+                "id": room.next_chat_id,
+                "playerId": player_id,
+                "name": name,
+                "text": text,
+            })
+            room.next_chat_id += 1
+            room.chat_last_sent[player_id] = now
+            break
+        if len(room.chat_messages) > 50:
+            del room.chat_messages[:-50]
 
     def leave_room(self, code, payload):
         role = payload.get("role")

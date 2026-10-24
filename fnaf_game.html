@@ -264,6 +264,83 @@
             font-size: 12px;
             text-align: right;
         }
+        #chat-toggle, #spectator-controls button {
+            border: 1px solid #69767b;
+            border-radius: 3px;
+            background: rgba(20, 25, 29, 0.94);
+            color: #eee;
+            font: inherit;
+            cursor: pointer;
+        }
+        #chat-toggle {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 7;
+            min-height: 36px;
+            padding: 6px 10px;
+        }
+        #chat-panel[hidden], #spectator-controls[hidden] { display: none; }
+        #chat-panel {
+            position: absolute;
+            top: 52px;
+            left: 10px;
+            z-index: 7;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: min(300px, calc(100% - 20px));
+            max-height: 42%;
+            padding: 8px;
+            border: 1px solid #69767b;
+            border-radius: 4px;
+            background: rgba(12, 15, 19, 0.94);
+        }
+        #chat-log {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-height: 42px;
+            overflow-y: auto;
+            color: #e4e8e9;
+            font-size: 12px;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+            user-select: text;
+        }
+        #chat-form { display: flex; gap: 5px; }
+        #chat-input {
+            min-width: 0;
+            flex: 1;
+            padding: 6px;
+            border: 1px solid #555;
+            border-radius: 3px;
+            background: #22242d;
+            color: #eee;
+            font: inherit;
+            font-size: 12px;
+            user-select: text;
+        }
+        #chat-form button { padding: 5px 8px; font: inherit; }
+        #spectator-controls {
+            position: absolute;
+            top: 52px;
+            left: 50%;
+            z-index: 7;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: calc(100% - 20px);
+            padding: 6px;
+            transform: translateX(-50%);
+            border: 1px solid #69767b;
+            border-radius: 4px;
+            background: rgba(12, 15, 19, 0.92);
+            color: #eee;
+            font-size: 12px;
+        }
+        #spectator-controls button { min-width: 32px; min-height: 30px; }
+        #spectator-player { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #sound-settings input { width: 100%; }
         @keyframes jumpscare-flash {
             50% { background: rgba(220, 15, 15, 0.78); }
@@ -663,6 +740,19 @@
                 <button type="button" data-action="interact" aria-label="Tương tác">E</button>
             </div>
         </div>
+        <button id="chat-toggle" type="button" hidden aria-expanded="false" aria-controls="chat-panel">Chat</button>
+        <section id="chat-panel" hidden aria-label="Chat trong phòng">
+            <div id="chat-log" role="log" aria-live="polite"></div>
+            <form id="chat-form">
+                <input id="chat-input" maxlength="200" autocomplete="off" placeholder="Nhắn tin..." aria-label="Tin nhắn">
+                <button type="submit">Gửi</button>
+            </form>
+        </section>
+        <div id="spectator-controls" hidden aria-label="Quan sát đồng đội">
+            <button id="spectator-previous" type="button" aria-label="Đồng đội trước">‹</button>
+            <span id="spectator-player"></span>
+            <button id="spectator-next" type="button" aria-label="Đồng đội tiếp theo">›</button>
+        </div>
 
         <div id="jumpscare-overlay" aria-hidden="true"><img id="jumpscare-image" alt=""></div>
         <div id="round-end-overlay" hidden>
@@ -732,6 +822,12 @@ const lobbyOverlay = document.getElementById('lobby-overlay');
 const homeScreen = document.getElementById('home-screen');
 const mobileControls = document.getElementById('mobile-controls');
 const mobileCameraControls = document.getElementById('mobile-camera-controls');
+const chatToggle = document.getElementById('chat-toggle');
+const chatPanel = document.getElementById('chat-panel');
+const chatLog = document.getElementById('chat-log');
+const chatInput = document.getElementById('chat-input');
+const spectatorControls = document.getElementById('spectator-controls');
+const spectatorPlayerLabel = document.getElementById('spectator-player');
 const eventNotice = document.getElementById('event-notice');
 const roundEndOverlay = document.getElementById('round-end-overlay');
 const jumpscareOverlay = document.getElementById('jumpscare-overlay');
@@ -1032,6 +1128,11 @@ let localPlayerId = 1;
 let room = null;
 const remoteInputs = {};
 let remoteActions = [];
+let spectateTargetId = 0;
+let chatCursor = 0;
+let chatPanelOpen = false;
+let lastChatSentAt = 0;
+const queuedChatMessages = [];
 // --- ANIMATRONICS ---
 const animatronics = [
     { type: 'freddy', x: 220, y: 142, dir: 1, speed: 0.45, path: [], nextPathAt: 0, targetKey: '', patrolTarget: null },
@@ -1261,6 +1362,66 @@ function getLocalPlayer() {
     return players.find(player => player.id === localPlayerId);
 }
 
+function getLivingTeammates() {
+    return players.filter(player => player.id !== localPlayerId && !player.isDead);
+}
+
+function getSpectateTarget() {
+    const localPlayer = getLocalPlayer();
+    if (!localPlayer?.isDead) return null;
+    const teammates = getLivingTeammates();
+    if (!teammates.length) {
+        spectateTargetId = 0;
+        return null;
+    }
+    if (!teammates.some(player => player.id === spectateTargetId)) {
+        spectateTargetId = teammates[0].id;
+    }
+    return teammates.find(player => player.id === spectateTargetId);
+}
+
+function cycleSpectateTarget(direction) {
+    const teammates = getLivingTeammates();
+    if (!getLocalPlayer()?.isDead || !teammates.length) return;
+    const currentIndex = teammates.findIndex(player => player.id === spectateTargetId);
+    const startIndex = currentIndex < 0 ? 0 : currentIndex;
+    spectateTargetId = teammates[(startIndex + direction + teammates.length) % teammates.length].id;
+}
+
+function resetChat() {
+    chatCursor = 0;
+    chatPanelOpen = false;
+    lastChatSentAt = 0;
+    queuedChatMessages.length = 0;
+    chatLog.replaceChildren();
+    chatPanel.hidden = true;
+    chatToggle.setAttribute('aria-expanded', 'false');
+}
+
+function appendChatMessages(messages) {
+    for (const message of messages) {
+        if (!Number.isInteger(message.id) || message.id <= chatCursor
+            || typeof message.name !== 'string' || typeof message.text !== 'string') continue;
+        const line = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = `${message.name}: `;
+        const text = document.createElement('span');
+        text.textContent = message.text;
+        line.append(name, text);
+        chatLog.appendChild(line);
+        chatCursor = message.id;
+    }
+    while (chatLog.childElementCount > 50) chatLog.firstElementChild.remove();
+    if (messages.length) chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function queueChatMessage(text) {
+    const message = text.trim().slice(0, 200);
+    if (!room || !message) return;
+    queuedChatMessages.push(message);
+    chatInput.value = '';
+}
+
 function sendPlayerAction(player, action) {
     if (room?.role === 'guest') queuedActions.push(action);
     else applyAction(player, action);
@@ -1303,6 +1464,10 @@ window.addEventListener('keydown', e => {
     const localPlayer = getLocalPlayer();
     if (key === 'r' && (gameOver || gameWon) && room?.role !== 'guest') {
         resetRound(true);
+        return;
+    }
+    if (localPlayer?.isDead && (key === 'arrowleft' || key === 'arrowright')) {
+        cycleSpectateTarget(key === 'arrowright' ? 1 : -1);
         return;
     }
     if (minigameActive && minigamePlayerId === localPlayer?.id) {
@@ -1993,7 +2158,7 @@ function updateUI() {
     if (!localPlayer) hint = '';
     else if (gameWon) hint = 'Bạn đã sống sót đến bình minh!';
     else if (gameOver) hint = 'Không còn ai sống sót.';
-    else if (localPlayer.isDead) hint = 'Bạn đã bị bắt · Đang chờ đồng đội.';
+    else if (localPlayer.isDead) hint = 'Bạn đã bị bắt · ←/→ để quan sát đồng đội còn sống.';
     else if (minigameActive && minigameType === 'heartbeat') hint = 'Nhịp tim · Nhấn E / Space đúng lúc!';
     else if (minigameActive && minigameType === 'memory') hint = 'Trí nhớ · Chọn đúng chuỗi màu (phím 1–4). Esc để rời sửa máy.';
     else if (minigameActive && minigameType === 'puzzle') hint = 'Xếp hình · Dùng phím mũi tên hoặc bấm ô sát ô trống. Esc để rời sửa máy.';
@@ -2058,7 +2223,7 @@ lightingCanvas.height = VIEW_HEIGHT;
 const lightingContext = lightingCanvas.getContext('2d');
 
 function getCameraPosition() {
-    const player = getLocalPlayer() || players[0];
+    const player = getSpectateTarget() || getLocalPlayer() || players[0];
     const visibleWidth = VIEW_WIDTH / CAMERA_ZOOM;
     const visibleHeight = VIEW_HEIGHT / CAMERA_ZOOM;
     return {
@@ -2161,6 +2326,14 @@ function render() {
     mobileControls.hidden = !gameStarted;
     document.getElementById('music-toggle').hidden = !gameStarted;
     const localPlayer = getLocalPlayer();
+    chatToggle.hidden = !gameStarted || !room;
+    chatPanel.hidden = !gameStarted || !room || !chatPanelOpen;
+    chatToggle.setAttribute('aria-expanded', String(chatPanelOpen && gameStarted && Boolean(room)));
+    const spectateTarget = getSpectateTarget();
+    spectatorControls.hidden = !gameStarted || !localPlayer?.isDead || !spectateTarget;
+    spectatorPlayerLabel.textContent = spectateTarget
+        ? `Đang xem: ${spectateTarget.name} · ←/→`
+        : '';
     signalNoise.classList.toggle('active', gameStarted && (!mapLightsOn || Boolean(localPlayer?.cameraWatching)));
     if (!gameStarted) {
         ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
@@ -2393,12 +2566,25 @@ function applyStateSnapshot(state) {
         }, { type: 'freddy', distance: Infinity });
         showJumpscare(nearestAnimatronic.type);
     }
-    players.splice(0, players.length, ...state.players.map(player => ({
-        ...player,
-        hideStartedAt: player.hideElapsedMs ? Date.now() - player.hideElapsedMs : 0,
-        hideNextMinigameAt: Date.now() + (player.hideNextInMs || 0),
-        closetCaughtUntil: Date.now() + (player.closetCaughtRemainingMs || 0)
-    })));
+    const previousPlayers = new Map(players.map(player => [player.id, player]));
+    players.splice(0, players.length, ...state.players.map(player => {
+        const previous = previousPlayers.get(player.id);
+        let x = player.x;
+        let y = player.y;
+        if (previous && !player.isDead && !previous.isDead) {
+            const correction = player.id === localPlayerId ? 0.24 : 0.4;
+            x = previous.x + (player.x - previous.x) * correction;
+            y = previous.y + (player.y - previous.y) * correction;
+        }
+        return {
+            ...player,
+            x,
+            y,
+            hideStartedAt: player.hideElapsedMs ? Date.now() - player.hideElapsedMs : 0,
+            hideNextMinigameAt: Date.now() + (player.hideNextInMs || 0),
+            closetCaughtUntil: Date.now() + (player.closetCaughtRemainingMs || 0)
+        };
+    }));
     if (!players.some(player => player.id === localPlayerId)) players.push(createPlayer(localPlayerId, 300, 620));
     state.officeDoors?.forEach((door, index) => {
         if (officeDoors[index]) officeDoors[index].closedUntil = Date.now() + (door.closedRemainingMs || 0);
@@ -2444,8 +2630,8 @@ function applyStateSnapshot(state) {
         ? { x: state.soundTarget.x, y: state.soundTarget.y, expiresAt: Date.now() + state.soundTarget.remainingMs }
         : null;
     state.animatronics.forEach((bot, index) => {
-        animatronics[index].x = bot.x;
-        animatronics[index].y = bot.y;
+        animatronics[index].x += (bot.x - animatronics[index].x) * 0.4;
+        animatronics[index].y += (bot.y - animatronics[index].y) * 0.4;
         animatronics[index].dir = bot.dir;
     });
     minigameTitle.innerText = minigameType === 'heartbeat' ? 'NHỊP TIM · GIỮ BÌNH TĨNH'
@@ -2606,6 +2792,7 @@ function configureDifficulty(difficulty, playerCount = players.length) {
 
 function resetRound(startNow = true) {
     if (room?.role === 'guest') return;
+    spectateTargetId = 0;
     configureDifficulty(difficultySelect.value, room ? Math.max(1, players.length) : 1);
     const profiles = players.map(player => ({
         id: player.id,
@@ -2711,6 +2898,7 @@ function resetRound(startNow = true) {
 async function returnToMainMenu() {
     const previousRoom = room;
     room = null;
+    resetChat();
     if (previousRoom) {
         try {
             await apiRequest(`/api/rooms/${previousRoom.code}/leave`, {
@@ -2733,6 +2921,7 @@ async function returnToMainMenu() {
 async function exitGame() {
     const previousRoom = room;
     room = null;
+    resetChat();
     document.getElementById('exit-status').innerText = '';
     if (previousRoom) {
         try {
@@ -2760,6 +2949,22 @@ document.getElementById('play-button').addEventListener('click', () => {
     lobbyOverlay.hidden = false;
     updateUI();
 });
+chatToggle.addEventListener('click', () => {
+    chatPanelOpen = !chatPanelOpen;
+    chatPanel.hidden = !chatPanelOpen;
+    chatToggle.setAttribute('aria-expanded', String(chatPanelOpen));
+    if (chatPanelOpen) chatInput.focus();
+});
+document.getElementById('chat-form').addEventListener('submit', event => {
+    event.preventDefault();
+    queueChatMessage(chatInput.value);
+    chatPanelOpen = true;
+    chatPanel.hidden = false;
+    chatToggle.setAttribute('aria-expanded', 'true');
+    chatInput.focus();
+});
+document.getElementById('spectator-previous').addEventListener('click', () => cycleSpectateTarget(-1));
+document.getElementById('spectator-next').addEventListener('click', () => cycleSpectateTarget(1));
 document.getElementById('music-toggle').addEventListener('click', () => {
     if (backgroundMusic.paused) {
         void startBackgroundMusic();
@@ -2872,6 +3077,7 @@ document.getElementById('create-room').addEventListener('click', async event => 
         if (!/^[0-9]{6}$/.test(result.code) || typeof result.token !== 'string') {
             throw new Error('Máy chủ trả về mã phòng không hợp lệ.');
         }
+        resetChat();
         room = { role: 'host', code: result.code, token: result.token, playerId: 1 };
         updateRoomControls();
         document.getElementById('room-code-display').innerText = result.code;
@@ -2905,6 +3111,7 @@ document.getElementById('join-form').addEventListener('submit', async event => {
             throw new Error('Máy chủ trả về thông tin phòng không hợp lệ.');
         }
         room = { role: 'guest', code: result.code, token: result.token, playerId: result.playerId };
+        resetChat();
         localPlayerId = result.playerId;
         const spawn = PLAYER_SPAWNS[localPlayerId - 1] || PLAYER_SPAWNS[0];
         players.splice(0, players.length, createPlayer(localPlayerId, spawn[0], spawn[1]));
@@ -2943,6 +3150,7 @@ document.getElementById('leave-room').addEventListener('click', async () => {
     if (!room) return;
     const previousRoom = room;
     room = null;
+    resetChat();
     try {
         await apiRequest(`/api/rooms/${previousRoom.code}/leave`, {
             role: previousRoom.role,
@@ -2974,11 +3182,17 @@ async function syncRoom() {
     syncInProgress = true;
     const currentRoom = room;
     const actions = currentRoom.role === 'guest' ? queuedActions.splice(0) : [];
+    const chatMessages = queuedChatMessages.length && Date.now() - lastChatSentAt >= 1000
+        ? queuedChatMessages.splice(0, 1)
+        : [];
+    if (chatMessages.length) lastChatSentAt = Date.now();
     try {
         const payload = {
             role: currentRoom.role,
             token: currentRoom.token,
-            playerId: currentRoom.playerId
+            playerId: currentRoom.playerId,
+            chatCursor,
+            chatMessages
         };
         if (currentRoom.role === 'host') payload.state = createStateSnapshot();
         else payload.input = {
@@ -2989,6 +3203,7 @@ async function syncRoom() {
         const result = await apiRequest(`/api/rooms/${currentRoom.code}/sync`, payload);
         if (room !== currentRoom) return;
         lastSyncAt = Date.now();
+        appendChatMessages(result.chatMessages || []);
         if (currentRoom.role === 'host') {
             updateGuestState(result.connectedPlayerIds || [], result.guestProfiles || {}, result.inputs || {});
         } else {
@@ -2997,10 +3212,17 @@ async function syncRoom() {
         }
     } catch (error) {
         if (currentRoom.role === 'guest') queuedActions.unshift(...actions);
+        if (chatMessages.length) {
+            queuedChatMessages.unshift(...chatMessages);
+            lastChatSentAt = 0;
+        }
         if (room === currentRoom) updateRoomStatus(`Mất kết nối máy chủ: ${error.message} · Đang thử kết nối lại`, true);
     } finally {
         syncInProgress = false;
-        if (room) setTimeout(syncRoom, lastSyncAt && Date.now() - lastSyncAt > 3000 ? 1000 : 100);
+        if (room) {
+            const retryDelay = lastSyncAt && Date.now() - lastSyncAt > 3000 ? 1000 : gameStarted ? 60 : 150;
+            setTimeout(syncRoom, retryDelay);
+        }
     }
 }
 
