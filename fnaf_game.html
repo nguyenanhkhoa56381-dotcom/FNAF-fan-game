@@ -864,6 +864,50 @@ async function startBackgroundMusic() {
 
 function playSound(type) {
     if (AudioCtx.state === 'suspended') AudioCtx.resume();
+    if (type === 'jumpscare') {
+        const duration = 0.75;
+        const now = AudioCtx.currentTime;
+        const noiseBuffer = AudioCtx.createBuffer(1, Math.ceil(AudioCtx.sampleRate * duration), AudioCtx.sampleRate);
+        const noiseData = noiseBuffer.getChannelData(0);
+        for (let index = 0; index < noiseData.length; index++) {
+            noiseData[index] = (Math.random() * 2 - 1) * (1 - index / noiseData.length);
+        }
+        const noise = AudioCtx.createBufferSource();
+        const filter = AudioCtx.createBiquadFilter();
+        const noiseGain = AudioCtx.createGain();
+        noise.buffer = noiseBuffer;
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1450, now);
+        filter.frequency.exponentialRampToValueAtTime(420, now + duration);
+        filter.Q.value = 1.1;
+        noiseGain.gain.setValueAtTime(0.001, now);
+        noiseGain.gain.linearRampToValueAtTime(0.12, now + 0.06);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(masterGain);
+        noise.start(now);
+        noise.stop(now + duration);
+
+        const scream = AudioCtx.createOscillator();
+        const screamFilter = AudioCtx.createBiquadFilter();
+        const screamGain = AudioCtx.createGain();
+        scream.type = 'sawtooth';
+        scream.frequency.setValueAtTime(920, now);
+        scream.frequency.exponentialRampToValueAtTime(310, now + 0.48);
+        scream.frequency.exponentialRampToValueAtTime(430, now + duration);
+        screamFilter.type = 'lowpass';
+        screamFilter.frequency.value = 1800;
+        screamGain.gain.setValueAtTime(0.001, now);
+        screamGain.gain.linearRampToValueAtTime(0.09, now + 0.045);
+        screamGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        scream.connect(screamFilter);
+        screamFilter.connect(screamGain);
+        screamGain.connect(masterGain);
+        scream.start(now);
+        scream.stop(now + duration);
+        return;
+    }
     const osc = AudioCtx.createOscillator();
     const gain = AudioCtx.createGain();
     osc.connect(gain);
@@ -874,13 +918,6 @@ function playSound(type) {
         gain.gain.setValueAtTime(0.08, AudioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, AudioCtx.currentTime + 0.08);
         osc.start(); osc.stop(AudioCtx.currentTime + 0.08);
-    } else if (type === 'jumpscare') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(120, AudioCtx.currentTime);
-        osc.frequency.linearRampToValueAtTime(550, AudioCtx.currentTime + 0.4);
-        gain.gain.setValueAtTime(0.25, AudioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.001, AudioCtx.currentTime + 0.5);
-        osc.start(); osc.stop(AudioCtx.currentTime + 0.5);
     } else if (type === 'win') {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(440, AudioCtx.currentTime);
@@ -1362,6 +1399,10 @@ function getLocalPlayer() {
     return players.find(player => player.id === localPlayerId);
 }
 
+function isLocalMinigameActive() {
+    return minigameActive && minigamePlayerId === localPlayerId;
+}
+
 function getLivingTeammates() {
     return players.filter(player => player.id !== localPlayerId && !player.isDead);
 }
@@ -1429,7 +1470,8 @@ function sendPlayerAction(player, action) {
 
 function applyAction(player, action) {
     if (!gameStarted || !player || player.isDead) return;
-    if (minigameActive && minigameDeadlineAt && Date.now() >= minigameDeadlineAt) {
+    if (minigameActive && player.id === minigamePlayerId
+        && minigameDeadlineAt && Date.now() >= minigameDeadlineAt) {
         handleMinigameTimeout();
         return;
     }
@@ -1456,7 +1498,7 @@ window.addEventListener('keydown', e => {
     if (isEditableTarget(e.target)) return;
     const key = getKeyboardKey(e);
     if (['w', 'a', 's', 'd', 'e', 'f', ' ', 'escape', 'r', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)
-        || (/^[1-5]$/.test(key) && (minigameActive || getLocalPlayer()?.cameraWatching))) e.preventDefault();
+        || (/^[1-5]$/.test(key) && (isLocalMinigameActive() || getLocalPlayer()?.cameraWatching))) e.preventDefault();
     if (keys[key]) return;
     keys[key] = true;
     if (!gameStarted) return;
@@ -1470,7 +1512,7 @@ window.addEventListener('keydown', e => {
         cycleSpectateTarget(key === 'arrowright' ? 1 : -1);
         return;
     }
-    if (minigameActive && minigamePlayerId === localPlayer?.id) {
+    if (isLocalMinigameActive()) {
         if (key === 'escape' && minigameType !== 'heartbeat') {
             sendPlayerAction(localPlayer, 'generator-abort');
             return;
@@ -1585,6 +1627,7 @@ function update() {
 
     if (room?.role === 'guest') {
         if (!gameOver && !gameWon) playerMovement(localPlayer, keys, deltaSeconds);
+        smoothNetworkPositions(deltaSeconds);
         updateUI();
         return;
     }
@@ -1758,7 +1801,7 @@ function movePlayer(p, dx, dy) {
 
 function interact(p) {
     if (p.isDead) return;
-    if (minigameActive) {
+    if (minigameActive && p.id === minigamePlayerId) {
         if (minigameType === 'heartbeat' || (currentGeneratorIndex >= 0 && Math.hypot(p.x + PLAYER_WIDTH / 2 - generators[currentGeneratorIndex].x, p.y + PLAYER_HEIGHT / 2 - generators[currentGeneratorIndex].y) < 40)) {
             checkMinigameHit(p);
         }
@@ -1836,7 +1879,9 @@ function interact(p) {
     const generatorIndex = generators.findIndex((item, index) => index < requiredGeneratorCount && !item.fixed && Math.hypot(playerX - item.x, playerY - item.y) < 20);
 
     if (generatorIndex >= 0) {
-        if (Date.now() < generatorBlockedUntil) {
+        if (minigameActive) {
+            showNotice(`${players.find(player => player.id === minigamePlayerId)?.name || 'Người chơi khác'} đang sửa máy phát.`);
+        } else if (Date.now() < generatorBlockedUntil) {
             showNotice(`Máy phát quá tải. Chờ ${Math.ceil((generatorBlockedUntil - Date.now()) / 1000)} giây.`);
         } else if (!hasHammer) showNotice('Cần nhặt búa sửa chữa trước khi sửa máy phát.');
         else startMinigame(generatorIndex, p);
@@ -1851,13 +1896,14 @@ function getNextHideMinigameAt() {
 
 function updateMinigameDisplay() {
     const isGenerator = minigameType !== 'heartbeat';
-    minigameOverlay.style.display = minigameActive ? 'flex' : 'none';
+    const isLocalMinigame = minigameActive && minigamePlayerId === localPlayerId;
+    minigameOverlay.style.display = isLocalMinigame ? 'flex' : 'none';
     document.getElementById('minigame-bar').style.display =
-        minigameType === 'generator' || minigameType === 'heartbeat' ? 'block' : 'none';
-    memoryPad.hidden = minigameType !== 'memory';
-    puzzleBoard.hidden = minigameType !== 'puzzle';
-    generatorExitButton.hidden = !isGenerator;
-    memorySequenceLabel.hidden = minigameType !== 'memory' || !memoryVisibleUntil;
+        isLocalMinigame && (minigameType === 'generator' || minigameType === 'heartbeat') ? 'block' : 'none';
+    memoryPad.hidden = !isLocalMinigame || minigameType !== 'memory';
+    puzzleBoard.hidden = !isLocalMinigame || minigameType !== 'puzzle';
+    generatorExitButton.hidden = !isLocalMinigame || !isGenerator;
+    memorySequenceLabel.hidden = !isLocalMinigame || minigameType !== 'memory' || !memoryVisibleUntil;
     memoryPad.querySelectorAll('button').forEach(button => {
         button.disabled = minigameType !== 'memory' || memoryVisibleUntil > Date.now() || minigamePlayerId !== localPlayerId;
     });
@@ -2159,12 +2205,12 @@ function updateUI() {
     else if (gameWon) hint = 'Bạn đã sống sót đến bình minh!';
     else if (gameOver) hint = 'Không còn ai sống sót.';
     else if (localPlayer.isDead) hint = 'Bạn đã bị bắt · ←/→ để quan sát đồng đội còn sống.';
-    else if (minigameActive && minigameType === 'heartbeat') hint = 'Nhịp tim · Nhấn E / Space đúng lúc!';
-    else if (minigameActive && minigameType === 'memory') hint = 'Trí nhớ · Chọn đúng chuỗi màu (phím 1–4). Esc để rời sửa máy.';
-    else if (minigameActive && minigameType === 'puzzle') hint = 'Xếp hình · Dùng phím mũi tên hoặc bấm ô sát ô trống. Esc để rời sửa máy.';
+    else if (isLocalMinigameActive() && minigameType === 'heartbeat') hint = 'Nhịp tim · Nhấn E / Space đúng lúc!';
+    else if (isLocalMinigameActive() && minigameType === 'memory') hint = 'Trí nhớ · Chọn đúng chuỗi màu (phím 1–4). Esc để rời sửa máy.';
+    else if (isLocalMinigameActive() && minigameType === 'puzzle') hint = 'Xếp hình · Dùng phím mũi tên hoặc bấm ô sát ô trống. Esc để rời sửa máy.';
     else if (localPlayer.cameraWatching) hint = `CAM ${localPlayer.cameraIndex + 1}/${CAMERA_ZONES.length} · ${CAMERA_ZONES[localPlayer.cameraIndex].name} · 1–5 đổi · E/Esc thoát${DIFFICULTIES[selectedDifficulty].camerasNeedPower ? ` · Điện máy tính ${Math.floor(computerPower)}%` : ''}`;
     else if (localPlayer.hiddenInCloset) hint = 'Đang trốn trong tủ · Nhấn E để bước ra.';
-    else if (minigameActive && minigameType === 'generator') hint = 'Khởi động máy · Nhấn E / Space khi vạch đỏ vào vùng xanh. Esc để thoát.';
+    else if (isLocalMinigameActive() && minigameType === 'generator') hint = 'Khởi động máy · Nhấn E / Space khi vạch đỏ vào vùng xanh. Esc để thoát.';
     else {
         const x = localPlayer.x + PLAYER_WIDTH / 2;
         const y = localPlayer.y + PLAYER_HEIGHT / 2;
@@ -2295,7 +2341,7 @@ function drawCameraMonitor(player) {
 }
 
 function drawTimingMinigame() {
-    if (!minigameActive) return;
+    if (!minigameActive || minigamePlayerId !== localPlayerId) return;
     const width = 260;
     const height = 20;
     const x = (VIEW_WIDTH - width) / 2;
@@ -2569,17 +2615,13 @@ function applyStateSnapshot(state) {
     const previousPlayers = new Map(players.map(player => [player.id, player]));
     players.splice(0, players.length, ...state.players.map(player => {
         const previous = previousPlayers.get(player.id);
-        let x = player.x;
-        let y = player.y;
-        if (previous && !player.isDead && !previous.isDead) {
-            const correction = player.id === localPlayerId ? 0.24 : 0.4;
-            x = previous.x + (player.x - previous.x) * correction;
-            y = previous.y + (player.y - previous.y) * correction;
-        }
+        const canInterpolate = room?.role === 'guest' && previous && !player.isDead && !previous.isDead;
         return {
             ...player,
-            x,
-            y,
+            x: canInterpolate ? previous.x : player.x,
+            y: canInterpolate ? previous.y : player.y,
+            networkTargetX: player.x,
+            networkTargetY: player.y,
             hideStartedAt: player.hideElapsedMs ? Date.now() - player.hideElapsedMs : 0,
             hideNextMinigameAt: Date.now() + (player.hideNextInMs || 0),
             closetCaughtUntil: Date.now() + (player.closetCaughtRemainingMs || 0)
@@ -2630,8 +2672,12 @@ function applyStateSnapshot(state) {
         ? { x: state.soundTarget.x, y: state.soundTarget.y, expiresAt: Date.now() + state.soundTarget.remainingMs }
         : null;
     state.animatronics.forEach((bot, index) => {
-        animatronics[index].x += (bot.x - animatronics[index].x) * 0.4;
-        animatronics[index].y += (bot.y - animatronics[index].y) * 0.4;
+        animatronics[index].networkTargetX = bot.x;
+        animatronics[index].networkTargetY = bot.y;
+        if (room?.role !== 'guest') {
+            animatronics[index].x = bot.x;
+            animatronics[index].y = bot.y;
+        }
         animatronics[index].dir = bot.dir;
     });
     minigameTitle.innerText = minigameType === 'heartbeat' ? 'NHỊP TIM · GIỮ BÌNH TĨNH'
@@ -2653,6 +2699,34 @@ function applyStateSnapshot(state) {
     document.getElementById('game-info').hidden = true;
     document.getElementById('controls-hint').hidden = gameStarted;
     updateUI();
+}
+
+function smoothNetworkPositions(deltaSeconds) {
+    if (room?.role !== 'guest') return;
+    for (const player of players) {
+        if (!Number.isFinite(player.networkTargetX) || !Number.isFinite(player.networkTargetY)) continue;
+        if (player.id === localPlayerId) {
+            const error = Math.hypot(player.networkTargetX - player.x, player.networkTargetY - player.y);
+            if (error > 40) {
+                player.x = player.networkTargetX;
+                player.y = player.networkTargetY;
+            } else if (!keys.w && !keys.a && !keys.s && !keys.d) {
+                const correction = 1 - Math.exp(-8 * deltaSeconds);
+                player.x += (player.networkTargetX - player.x) * correction;
+                player.y += (player.networkTargetY - player.y) * correction;
+            }
+            continue;
+        }
+        const blend = 1 - Math.exp(-12 * deltaSeconds);
+        player.x += (player.networkTargetX - player.x) * blend;
+        player.y += (player.networkTargetY - player.y) * blend;
+    }
+    for (const bot of animatronics) {
+        if (!Number.isFinite(bot.networkTargetX) || !Number.isFinite(bot.networkTargetY)) continue;
+        const blend = 1 - Math.exp(-10 * deltaSeconds);
+        bot.x += (bot.networkTargetX - bot.x) * blend;
+        bot.y += (bot.networkTargetY - bot.y) * blend;
+    }
 }
 
 async function apiRequest(path, body) {
