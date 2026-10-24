@@ -1247,6 +1247,16 @@ const queuedActions = [];
 let syncInProgress = false;
 let lastSyncAt = 0;
 
+function getKeyboardKey(event) {
+    const digitCode = /^(?:Digit|Numpad)([0-9])$/.exec(event.code);
+    return (digitCode ? digitCode[1] : event.key).toLowerCase();
+}
+
+function isEditableTarget(target) {
+    return target instanceof HTMLElement
+        && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+}
+
 function getLocalPlayer() {
     return players.find(player => player.id === localPlayerId);
 }
@@ -1282,8 +1292,10 @@ function applyAction(player, action) {
 }
 
 window.addEventListener('keydown', e => {
-    const key = e.key.toLowerCase();
-    if (['w', 'a', 's', 'd', 'e', 'f', ' ', 'escape', 'r', '1', '2', '3', '4', '5', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) e.preventDefault();
+    if (isEditableTarget(e.target)) return;
+    const key = getKeyboardKey(e);
+    if (['w', 'a', 's', 'd', 'e', 'f', ' ', 'escape', 'r', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)
+        || (/^[1-5]$/.test(key) && (minigameActive || getLocalPlayer()?.cameraWatching))) e.preventDefault();
     if (keys[key]) return;
     keys[key] = true;
     if (!gameStarted) return;
@@ -1326,7 +1338,9 @@ window.addEventListener('keydown', e => {
         sendPlayerAction(localPlayer, action);
     }
 });
-window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+window.addEventListener('keyup', e => {
+    keys[getKeyboardKey(e)] = false;
+});
 window.addEventListener('blur', () => {
     Object.keys(keys).forEach(key => { keys[key] = false; });
 });
@@ -2192,7 +2206,25 @@ function render() {
     if (!mapLightsOn) {
         lightingContext.globalCompositeOperation = 'destination-out';
         players.forEach(player => {
-            if (player.isDead || player.hiddenInCloset) return;
+            if (player.isDead) return;
+            if (player.hiddenInCloset) {
+                const playerX = player.x + PLAYER_WIDTH / 2;
+                const playerY = player.y + PLAYER_HEIGHT / 2;
+                const closet = closets.find(item => Math.hypot(playerX - item.x, playerY - item.y) < 20);
+                if (!closet) return;
+                const centerX = (closet.x - camera.x) * CAMERA_ZOOM;
+                const centerY = (closet.y - camera.y) * CAMERA_ZOOM;
+                const glowRadius = 124;
+                const closetLight = lightingContext.createRadialGradient(centerX, centerY, 5, centerX, centerY, glowRadius);
+                closetLight.addColorStop(0, 'rgba(0, 0, 0, 0.94)');
+                closetLight.addColorStop(0.55, 'rgba(0, 0, 0, 0.76)');
+                closetLight.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                lightingContext.fillStyle = closetLight;
+                lightingContext.beginPath();
+                lightingContext.arc(centerX, centerY, glowRadius, 0, Math.PI * 2);
+                lightingContext.fill();
+                return;
+            }
             const centerX = (player.x + PLAYER_WIDTH / 2 - camera.x) * CAMERA_ZOOM;
             const centerY = (player.y + PLAYER_HEIGHT / 2 - camera.y) * CAMERA_ZOOM;
             const ambientRadius = selectedDifficulty === 'easy' ? 118 : selectedDifficulty === 'normal' ? 102 : 86;
