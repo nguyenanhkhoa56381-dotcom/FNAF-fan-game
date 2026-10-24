@@ -1,0 +1,3014 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FNAF: Survive Until Dawn</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+        body {
+            background-color: #0c0d12;
+            color: #eee;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            padding: 8px;
+            gap: 8px;
+        }
+        button { touch-action: manipulation; }
+        #game-wrapper {
+            position: relative;
+            border: 4px solid #333;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+            background: #000;
+            width: min(100%, 1300px, calc(138.46vh - 140px));
+            width: min(100%, 1300px, calc(138.46dvh - 140px));
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            touch-action: none;
+        }
+        #signal-noise {
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+            background:
+                repeating-radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.2) 0 0.6px, transparent 0.9px 2.8px),
+                repeating-linear-gradient(0deg, transparent 0 2px, rgba(255, 255, 255, 0.14) 2.5px 3px),
+                repeating-linear-gradient(90deg, transparent 0 13px, rgba(255, 40, 40, 0.1) 14px 15px, transparent 16px 21px);
+            background-size: 8px 8px, auto, auto;
+            mix-blend-mode: screen;
+            transition: opacity 120ms linear;
+        }
+        #signal-noise.active {
+            opacity: 0.34;
+            animation: signal-interference 0.14s steps(2, end) infinite;
+        }
+        #signal-noise::after {
+            position: absolute;
+            inset: 0;
+            content: "";
+            background:
+                linear-gradient(0deg, transparent 0 26%, rgba(255, 255, 255, 0.2) 27%, transparent 30% 72%, rgba(0, 220, 255, 0.18) 73%, transparent 76%),
+                repeating-linear-gradient(0deg, transparent 0 11px, rgba(255, 255, 255, 0.12) 12px 13px);
+            animation: signal-roll 1.8s steps(1, end) infinite;
+        }
+        #gameCanvas {
+            width: 100%;
+            height: auto;
+        }
+        #interaction-hint {
+            min-height: 22px;
+            width: min(100%, 1300px);
+            padding: 8px 12px;
+            border: 1px solid #777;
+            border-radius: 4px;
+            background: rgba(12, 13, 18, 0.9);
+            color: #fff;
+            font-size: 13px;
+            text-align: center;
+        }
+        #interaction-hint:empty { visibility: hidden; }
+        #game-info {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px 16px;
+            width: min(100%, 1300px);
+            padding: 8px 12px;
+            border: 1px solid #393a43;
+            background: #14151c;
+            font-size: 13px;
+        }
+        #game-info span { white-space: nowrap; }
+        #event-notice {
+            min-height: 20px;
+            color: #f1c40f;
+            text-align: center;
+        }
+        #room-panel {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            width: min(100%, 1300px);
+            padding: 10px;
+            border: 1px solid #393a43;
+            background: #14151c;
+        }
+        #room-panel input, #room-panel button, #room-panel select,
+        #lobby-overlay input, #lobby-overlay select, #lobby-overlay button {
+            min-height: 36px;
+            padding: 6px 10px;
+            border: 1px solid #555;
+            border-radius: 3px;
+            background: #22242d;
+            color: #eee;
+            font: inherit;
+        }
+        #room-panel button { cursor: pointer; }
+        #room-panel[hidden], #game-info[hidden], #event-notice[hidden], #controls-hint[hidden] { display: none; }
+        #coop-server-form { display: flex; flex: 1 1 100%; gap: 6px; }
+        #coop-server-url { min-width: 0; flex: 1; }
+        #setup-room-status, #game-room-status {
+            flex-basis: 100%;
+            color: #bbb;
+            font-size: 12px;
+            text-align: center;
+        }
+        #lobby-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(7, 8, 12, 0.94);
+            overflow: auto;
+        }
+        #lobby-overlay[hidden] { display: none; }
+        #lobby-card {
+            width: min(720px, 100%);
+            max-height: 100%;
+            overflow: auto;
+            padding: 20px;
+            border: 2px solid #654b36;
+            background: #15161c;
+            box-shadow: 0 0 36px rgba(0, 0, 0, 0.8);
+        }
+        #lobby-card h1 { margin-bottom: 12px; color: #f1c40f; text-align: center; }
+        #lobby-card label { display: flex; flex-direction: column; gap: 5px; }
+        #lobby-settings {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 10px;
+            margin: 12px 0;
+        }
+        #character-choices, #mode-choices, #lobby-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin: 12px 0;
+        }
+        #character-choices button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            min-width: 92px;
+        }
+        #character-choices img { width: 32px; height: 56px; object-fit: contain; image-rendering: pixelated; }
+        #character-choices button.selected, #mode-choices button.selected {
+            border-color: #f1c40f;
+            box-shadow: 0 0 8px rgba(241, 196, 15, 0.45);
+        }
+        #room-code-display { color: #f1c40f; font-size: 22px; font-weight: bold; letter-spacing: 4px; }
+        #room-code-display:empty { display: none; }
+        #setup-status { min-height: 20px; color: #bbb; text-align: center; }
+        #restart-button {
+            padding: 8px 16px;
+            border: 1px solid #777;
+            background: #20212a;
+            color: #fff;
+            font: inherit;
+            cursor: pointer;
+        }
+        #round-end-overlay, #exit-screen {
+            position: absolute;
+            inset: 0;
+            z-index: 12;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(7, 8, 12, 0.88);
+        }
+        #round-end-overlay[hidden], #exit-screen[hidden] { display: none; }
+        #round-end-card, #exit-card {
+            width: min(460px, 100%);
+            padding: 24px;
+            border: 2px solid #654b36;
+            background: #15161c;
+            text-align: center;
+        }
+        #round-end-card h2, #exit-card h2 { margin: 0 0 10px; color: #f1c40f; }
+        #round-end-actions, #exit-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 18px;
+        }
+        #round-end-actions button, #exit-actions button { font: inherit; }
+        #jumpscare-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 11;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: rgba(100, 0, 0, 0.92);
+            animation: jumpscare-flash 0.08s steps(2, end) infinite;
+        }
+        #jumpscare-overlay.active { display: flex; }
+        #jumpscare-image {
+            width: min(90vw, 720px);
+            height: 90%;
+            object-fit: contain;
+            image-rendering: pixelated;
+            animation: jumpscare-shake 0.07s steps(2, end) infinite;
+        }
+        #sound-settings { display: flex; align-items: center; gap: 8px; }
+        #music-settings { display: flex; align-items: center; gap: 8px; }
+        #music-settings input { width: 100%; }
+        #music-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 6;
+            min-height: 36px;
+            padding: 6px 10px;
+            border: 1px solid #555;
+            border-radius: 3px;
+            background: #22242d;
+            color: #eee;
+            font: inherit;
+            cursor: pointer;
+        }
+        #music-status {
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            z-index: 6;
+            max-width: min(320px, calc(100% - 20px));
+            color: #ff7373;
+            font-size: 12px;
+            text-align: right;
+        }
+        #sound-settings input { width: 100%; }
+        @keyframes jumpscare-flash {
+            50% { background: rgba(220, 15, 15, 0.78); }
+        }
+        @keyframes jumpscare-shake {
+            0% { transform: translate(-9px, 5px) scale(1.12); }
+            100% { transform: translate(9px, -5px) scale(1.2); }
+        }
+        #event-notice { display: none; }
+        #minigame-overlay {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(360px, calc(100% - 24px));
+            box-sizing: border-box;
+            background: rgba(10, 13, 16, 0.94);
+            border: 2px solid #00f2ff;
+            padding: 10px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 0 20px rgba(0,242,255,0.5);
+            z-index: 10;
+        }
+        #minigame-overlay h3, #minigame-overlay p { margin: 3px 0; text-align: center; }
+        #minigame-bar { display: none; }
+        #minigame-controls { display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; }
+        #minigame-controls button { font: inherit; }
+        #minigame-memory-pad, #minigame-puzzle {
+            display: grid;
+            gap: 5px;
+            margin: 6px 0;
+        }
+        #minigame-memory-pad { grid-template-columns: repeat(2, 42px); }
+        #minigame-memory-pad[hidden], #minigame-puzzle[hidden], #generator-exit[hidden] { display: none; }
+        #minigame-memory-pad button { width: 42px; height: 36px; border: 2px solid #cbd3d5; }
+        #minigame-memory-pad button.active { outline: 3px solid #fff; transform: scale(1.1); }
+        #minigame-puzzle { grid-template-columns: repeat(3, 36px); }
+        #minigame-puzzle button { width: 36px; height: 36px; font-weight: bold; }
+        #minigame-puzzle button.empty { visibility: hidden; }
+        #generator-exit { margin-top: 5px; }
+        #minigame-bar {
+            width: 260px;
+            height: 25px;
+            background: #222;
+            position: relative;
+            margin: 15px 0;
+            border: 1px solid #777;
+        }
+        #minigame-target {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: #2ecc71;
+            width: 50px;
+            left: 100px;
+        }
+        #minigame-pointer {
+            position: absolute;
+            top: 0;
+            width: 5px;
+            height: 100%;
+            background: #e74c3c;
+            left: 0;
+        }
+        #controls-hint {
+            width: min(100%, 1300px);
+            color: #aaa;
+            font-size: 13px;
+            text-align: center;
+            line-height: 1.5;
+        }
+        #home-screen {
+            position: absolute;
+            inset: 0;
+            z-index: 7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 24px;
+            background:
+                radial-gradient(ellipse at 50% 42%, rgba(70, 22, 20, 0.35), transparent 55%),
+                linear-gradient(180deg, rgba(3, 4, 7, 0.68), rgba(3, 4, 7, 0.96));
+        }
+        #home-screen[hidden] { display: none; }
+        #home-screen::before, #home-screen::after {
+            position: absolute;
+            inset: -50%;
+            content: "";
+            pointer-events: none;
+        }
+        #home-screen::before {
+            background:
+                repeating-radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.18) 0 0.55px, transparent 0.8px 2.6px),
+                repeating-linear-gradient(0deg, transparent 0 2px, rgba(255, 255, 255, 0.12) 3px),
+                repeating-linear-gradient(90deg, transparent 0 7px, rgba(255, 35, 35, 0.07) 8px, transparent 10px);
+            background-size: 7px 7px, auto, auto;
+            mix-blend-mode: screen;
+            animation: screen-noise 0.1s steps(2, end) infinite;
+        }
+        #home-screen::after {
+            background:
+                repeating-linear-gradient(0deg, transparent 0 17px, rgba(255, 255, 255, 0.11) 18px, transparent 20px),
+                linear-gradient(0deg, transparent 0 14%, rgba(255, 30, 30, 0.22) 14.5%, transparent 17% 63%, rgba(0, 220, 255, 0.2) 64%, transparent 67%),
+                linear-gradient(90deg, transparent 0 46%, rgba(255, 30, 30, 0.22) 47%, transparent 49%, rgba(0, 220, 255, 0.2) 50%, transparent 53%);
+            animation: screen-glitch 1.7s steps(1, end) infinite;
+        }
+        #home-card {
+            position: relative;
+            z-index: 1;
+            width: min(680px, 100%);
+            padding: clamp(24px, 6vw, 56px) 20px;
+            border: 1px solid rgba(207, 191, 166, 0.42);
+            background: rgba(8, 9, 12, 0.64);
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.55), inset 0 0 36px rgba(255, 255, 255, 0.025);
+            text-align: center;
+        }
+        #home-title {
+            position: relative;
+            margin: 0 auto 12px;
+            width: fit-content;
+            color: #e5d9ca;
+            font-size: clamp(30px, 7vw, 64px);
+            letter-spacing: 0.08em;
+            line-height: 1.08;
+            text-shadow: 3px 0 rgba(255, 25, 25, 0.65), -3px 0 rgba(0, 220, 255, 0.45), 0 0 24px rgba(204, 38, 25, 0.28);
+            animation: title-flicker 5s steps(1, end) infinite;
+        }
+        #home-title .glitch-layer {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            color: #e5d9ca;
+            pointer-events: none;
+        }
+        #home-title .glitch-red {
+            left: 3px;
+            text-shadow: -2px 0 #ff3434;
+            clip-path: inset(12% 0 68% 0);
+            animation: title-glitch-red 1.4s steps(1, end) infinite;
+        }
+        #home-title .glitch-cyan {
+            left: -3px;
+            text-shadow: 2px 0 #19d5ed;
+            clip-path: inset(62% 0 16% 0);
+            animation: title-glitch-cyan 1.1s steps(1, end) infinite;
+        }
+        #home-subtitle {
+            margin: 0 0 34px;
+            color: #98918a;
+            font-size: clamp(10px, 2vw, 13px);
+            letter-spacing: 0.3em;
+        }
+        #play-button {
+            min-width: 190px;
+            min-height: 58px;
+            padding: 12px 32px;
+            border: 1px solid #b63730;
+            background: rgba(68, 18, 18, 0.75);
+            color: #f4e9df;
+            font: inherit;
+            font-size: 24px;
+            letter-spacing: 0.2em;
+            cursor: pointer;
+            transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+        }
+        #play-button:hover, #play-button:focus-visible {
+            outline: none;
+            background: #751d1c;
+            box-shadow: 0 0 24px rgba(221, 47, 39, 0.45);
+            transform: translateY(-2px);
+        }
+        #home-credit {
+            margin-top: 44px;
+            color: #8e8983;
+            font-size: 12px;
+            letter-spacing: 0.12em;
+        }
+        #mobile-controls { display: none; }
+        #mobile-controls[hidden] { display: none; }
+        #mobile-camera-controls[hidden] { display: none; }
+        @keyframes screen-noise {
+            0%, 100% { transform: translate(0, 0); opacity: 0.46; }
+            25% { transform: translate(1.4%, -0.8%); opacity: 0.8; }
+            50% { transform: translate(-0.7%, 1.1%); opacity: 0.58; }
+            75% { transform: translate(-1.2%, -0.5%); opacity: 0.92; }
+        }
+        @keyframes signal-interference {
+            0%, 100% { background-position: 0 0, 0 0, 0 0; }
+            50% { background-position: 3px -2px, 0 1px, -5px 0; }
+        }
+        @keyframes signal-roll {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.18; }
+            81% { transform: translateY(-8%); opacity: 0.85; }
+            83% { transform: translateY(5%); opacity: 0.5; }
+            85% { transform: translateY(0); opacity: 0.2; }
+        }
+        @keyframes screen-glitch {
+            0%, 7%, 9%, 23%, 25%, 44%, 47%, 68%, 71%, 91%, 94%, 100% { transform: translate(0); opacity: 0.2; }
+            8% { transform: translate(4%, -1.5%) skewY(-1deg); opacity: 0.95; }
+            24% { transform: translate(-3%, 1%) skewY(0.8deg); opacity: 0.82; }
+            45% { transform: translate(2%, 1.5%); opacity: 0.9; }
+            46% { transform: translate(-4%, -0.5%); opacity: 0.55; }
+            69% { transform: translate(-2%, -1.5%) skewY(-0.7deg); opacity: 0.96; }
+            92% { transform: translate(3%, 1%); opacity: 0.78; }
+        }
+        @keyframes title-flicker {
+            0%, 31%, 33%, 60%, 62%, 88%, 90%, 100% { opacity: 1; }
+            32%, 61%, 89% { opacity: 0.72; }
+        }
+        @keyframes title-glitch-red {
+            0%, 14%, 16%, 39%, 42%, 64%, 67%, 100% { transform: translate(0); opacity: 0; }
+            15% { transform: translate(12px, -4px); opacity: 0.95; clip-path: inset(12% 0 68% 0); }
+            40% { transform: translate(-7px, 3px); opacity: 0.85; clip-path: inset(43% 0 34% 0); }
+            65% { transform: translate(5px, 1px); opacity: 0.9; clip-path: inset(68% 0 10% 0); }
+        }
+        @keyframes title-glitch-cyan {
+            0%, 28%, 30%, 54%, 57%, 79%, 82%, 100% { transform: translate(0); opacity: 0; }
+            29% { transform: translate(-10px, 2px); opacity: 0.9; clip-path: inset(60% 0 18% 0); }
+            55% { transform: translate(6px, -4px); opacity: 0.9; clip-path: inset(30% 0 48% 0); }
+            80% { transform: translate(-4px, 1px); opacity: 0.85; clip-path: inset(8% 0 74% 0); }
+        }
+        @media (max-width: 760px), (pointer: coarse) {
+            body { padding: 4px; gap: 6px; }
+            #game-wrapper { width: min(100%, 1300px, calc(138.46dvh - 132px)); border-width: 2px; }
+            #lobby-overlay { padding: 8px; }
+            #lobby-card { width: 100%; padding: 14px; }
+            #lobby-card h1 { font-size: clamp(18px, 5vw, 26px); }
+            #lobby-settings { grid-template-columns: 1fr; gap: 8px; margin: 10px 0; }
+            #lobby-settings input, #lobby-settings select,
+            #lobby-actions button, #mode-choices button,
+            #room-panel button, #room-panel input {
+                min-height: 44px;
+                font-size: 14px;
+            }
+            #character-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(82px, 1fr)); }
+            #character-choices button { min-width: 0; min-height: 78px; }
+            #lobby-actions { display: grid; grid-template-columns: 1fr; }
+            #lobby-actions button { width: 100%; }
+            #room-panel { align-items: stretch; }
+            #coop-server-form { flex-direction: column; }
+            #join-form { display: flex; flex: 1 1 100%; gap: 6px; }
+            #join-form input { min-width: 0; flex: 1; }
+            #join-form button { flex: 1; }
+            #interaction-hint { min-height: 38px; padding: 8px; font-size: 11px; line-height: 1.4; }
+            #game-info { gap: 6px 10px; padding: 8px; font-size: 11px; }
+            #controls-hint { font-size: 11px; }
+            #mobile-controls:not([hidden]) {
+                position: absolute;
+                inset: auto 0 0;
+                z-index: 6;
+                display: flex;
+                align-items: flex-end;
+                justify-content: space-between;
+                padding: 10px;
+                pointer-events: none;
+                touch-action: none;
+            }
+            #mobile-controls button {
+                display: grid;
+                place-items: center;
+                width: clamp(44px, 13vw, 60px);
+                height: clamp(44px, 13vw, 60px);
+                border: 1px solid rgba(226, 220, 203, 0.55);
+                border-radius: 12px;
+                background: rgba(13, 15, 18, 0.72);
+                color: #f4eee2;
+                font: inherit;
+                font-size: 18px;
+                font-weight: bold;
+                pointer-events: auto;
+                touch-action: none;
+                user-select: none;
+                -webkit-tap-highlight-color: transparent;
+            }
+            #mobile-dpad {
+                display: grid;
+                grid-template-columns: repeat(3, clamp(44px, 13vw, 60px));
+                grid-template-rows: repeat(2, clamp(44px, 13vw, 60px));
+                gap: 4px;
+                pointer-events: none;
+            }
+            #mobile-dpad [data-key="w"] { grid-column: 2; grid-row: 1; }
+            #mobile-dpad [data-key="a"] { grid-column: 1; grid-row: 2; }
+            #mobile-dpad [data-key="s"] { grid-column: 2; grid-row: 2; }
+            #mobile-dpad [data-key="d"] { grid-column: 3; grid-row: 2; }
+            #mobile-actions {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 7px;
+                pointer-events: none;
+            }
+            #mobile-actions button { min-width: 62px; width: auto; padding: 0 10px; }
+            #mobile-actions [data-action="interact"] { width: 70px; height: 70px; border-radius: 50%; background: rgba(104, 30, 25, 0.82); }
+            #mobile-camera-controls { display: flex; gap: 6px; }
+        }
+        @media (max-width: 420px) {
+            #home-screen { padding: 12px; }
+            #home-card { padding: 30px 12px; }
+            #home-subtitle { margin-bottom: 26px; letter-spacing: 0.18em; }
+            #home-credit { margin-top: 32px; }
+            #lobby-card { padding: 10px; }
+            #room-panel { padding: 7px; }
+            #join-form { flex-direction: column; }
+            #minigame-overlay { top: 6px; padding: 8px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #home-screen::before, #home-screen::after, #home-title,
+            #home-title .glitch-layer, #signal-noise,
+            #signal-noise::after { animation: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <canvas id="gameCanvas" width="900" height="650"></canvas>
+        <div id="signal-noise" aria-hidden="true"></div>
+        <audio id="background-music" src="It's%20been%20so%20long.mp3" loop preload="none"></audio>
+        <button id="music-toggle" type="button" aria-pressed="false" hidden>Bật nhạc</button>
+        <p id="music-status" aria-live="polite"></p>
+        <div id="home-screen">
+            <div id="home-card">
+                <h1 id="home-title" aria-label="FNAF">FNAF<span class="glitch-layer glitch-red" aria-hidden="true">FNAF</span><span class="glitch-layer glitch-cyan" aria-hidden="true">FNAF</span></h1>
+                <p id="home-subtitle">SURVIVE UNTIL DAWN</p>
+                <button id="play-button" type="button">chơi</button>
+                <p id="home-credit">credit: nguyen anh khoa</p>
+            </div>
+        </div>
+        <div id="lobby-overlay" hidden>
+            <div id="lobby-card">
+                <h1>FNAF: SURVIVE UNTIL DAWN</h1>
+                <div id="lobby-settings">
+                    <label>Tên người chơi
+                        <input id="player-name" maxlength="18" value="player 1" autocomplete="off">
+                    </label>
+                    <label>Độ khó
+                        <select id="difficulty-select">
+                            <option value="easy">Dễ</option>
+                            <option value="normal" selected>Thường</option>
+                            <option value="hard">Khó</option>
+                        </select>
+                    </label>
+                    <label id="sound-settings">Âm lượng hiệu ứng
+                        <input id="volume-control" type="range" min="0" max="100" value="60" aria-label="Âm lượng hiệu ứng">
+                    </label>
+                    <label id="music-settings">Âm lượng nhạc
+                        <input id="music-volume" type="range" min="0" max="100" value="25" aria-label="Âm lượng nhạc">
+                    </label>
+                </div>
+                <strong>Chọn Night Guard</strong>
+                <div id="character-choices"></div>
+                <strong>Chọn chế độ</strong>
+                <div id="mode-choices">
+                    <button id="solo-mode" class="selected" type="button">Chơi đơn</button>
+                    <button id="coop-mode" type="button">Co-op LAN</button>
+                </div>
+                <div id="room-panel" hidden>
+                    <form id="coop-server-form">
+                        <input id="coop-server-url" type="url" inputmode="url" placeholder="Địa chỉ server co-op, ví dụ https://ten-app.onrender.com" aria-label="Địa chỉ server co-op">
+                        <button type="submit">Lưu và kiểm tra server</button>
+                    </form>
+                    <button id="create-room" type="button">Tạo phòng & tạo mã 6 số</button>
+                    <form id="join-form">
+                        <input id="join-code" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="Mã phòng 6 số" aria-label="Mã phòng co-op">
+                        <button type="submit">Tham gia phòng</button>
+                    </form>
+                    <span id="room-code-display"></span>
+                    <button id="leave-room" type="button" hidden>Thoát phòng</button>
+                    <span id="setup-room-status">Đặt server Python công khai để co-op qua link Netlify; cả nhóm dùng cùng địa chỉ server.</span>
+                </div>
+                <div id="setup-status"></div>
+                <div id="lobby-actions">
+                    <button id="start-game" type="button">Bắt đầu chơi đơn</button>
+                    <button id="start-room" type="button" hidden disabled>Chờ người chơi rồi bắt đầu</button>
+                    <button id="lobby-exit-game" type="button">Thoát game</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="mobile-controls" hidden aria-label="Điều khiển cảm ứng">
+            <div id="mobile-dpad" aria-label="Di chuyển">
+                <button type="button" data-key="w" aria-label="Đi lên">▲</button>
+                <button type="button" data-key="a" aria-label="Đi sang trái">◀</button>
+                <button type="button" data-key="s" aria-label="Đi xuống">▼</button>
+                <button type="button" data-key="d" aria-label="Đi sang phải">▶</button>
+            </div>
+            <div id="mobile-actions">
+                <div id="mobile-camera-controls" hidden>
+                    <button type="button" data-mobile-camera="-1" aria-label="Camera trước">‹</button>
+                    <button type="button" data-mobile-camera="1" aria-label="Camera tiếp">›</button>
+                </div>
+                <button type="button" data-action="light" aria-label="Bật hoặc tắt đèn pin">F</button>
+                <button type="button" data-action="interact" aria-label="Tương tác">E</button>
+            </div>
+        </div>
+
+        <div id="jumpscare-overlay" aria-hidden="true"><img id="jumpscare-image" alt=""></div>
+        <div id="round-end-overlay" hidden>
+            <div id="round-end-card">
+                <h2 id="round-end-title"></h2>
+                <p id="round-end-summary"></p>
+                <div id="round-end-actions">
+                    <button id="restart-button" type="button">Chơi lại</button>
+                    <button id="main-menu-button" type="button">Màn hình chính</button>
+                    <button id="end-exit-game" type="button">Thoát game</button>
+                </div>
+            </div>
+        </div>
+        <div id="exit-screen" hidden>
+            <div id="exit-card">
+                <h2>Đã thoát trò chơi</h2>
+                <p>Hãy đóng tab này để thoát hoàn toàn.</p>
+                <p id="exit-status" aria-live="polite"></p>
+                <div id="exit-actions">
+                    <button id="exit-close-tab" type="button">Đóng tab</button>
+                    <button id="exit-return-menu" type="button">Về màn hình chính</button>
+                </div>
+            </div>
+        </div>
+        <div id="minigame-overlay">
+            <h3 id="minigame-title" style="color: #00f2ff;">KHỞI ĐỘNG MÁY PHÁT</h3>
+            <p id="minigame-instruction" style="font-size: 12px; color: #ccc;">Bấm [E] khi vạch đỏ vào vùng xanh!</p>
+            <p id="minigame-memory-sequence" hidden></p>
+            <div id="minigame-memory-pad" hidden>
+                <button type="button" data-memory-index="0" aria-label="Ô nhớ 1"></button>
+                <button type="button" data-memory-index="1" aria-label="Ô nhớ 2"></button>
+                <button type="button" data-memory-index="2" aria-label="Ô nhớ 3"></button>
+                <button type="button" data-memory-index="3" aria-label="Ô nhớ 4"></button>
+            </div>
+            <div id="minigame-puzzle" hidden></div>
+            <div id="minigame-bar">
+                <div id="minigame-target"></div>
+                <div id="minigame-pointer"></div>
+            </div>
+            <p id="minigame-progress" style="font-weight: bold;">Tiến độ: 0/3</p>
+            <button id="generator-exit" type="button" hidden>Thoát minigame máy phát</button>
+        </div>
+    </div>
+
+    <div id="interaction-hint" aria-live="polite"></div>
+    <div id="game-info" hidden>
+        <span id="player-stats"></span>
+        <span id="objective-stats"></span>
+        <span id="hunt-stats"></span>
+        <span id="game-room-status"></span>
+    </div>
+    <div id="event-notice" aria-live="polite"></div>
+    <div id="controls-hint">
+        WASD di chuyển · E tương tác · F đèn pin · 1–5 camera
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const interactionHint = document.getElementById('interaction-hint');
+const roomStatus = document.getElementById('setup-room-status');
+const gameRoomStatus = document.getElementById('game-room-status');
+const setupStatus = document.getElementById('setup-status');
+const playerNameInput = document.getElementById('player-name');
+const difficultySelect = document.getElementById('difficulty-select');
+const lobbyOverlay = document.getElementById('lobby-overlay');
+const homeScreen = document.getElementById('home-screen');
+const mobileControls = document.getElementById('mobile-controls');
+const mobileCameraControls = document.getElementById('mobile-camera-controls');
+const eventNotice = document.getElementById('event-notice');
+const roundEndOverlay = document.getElementById('round-end-overlay');
+const jumpscareOverlay = document.getElementById('jumpscare-overlay');
+const jumpscareImage = document.getElementById('jumpscare-image');
+const exitScreen = document.getElementById('exit-screen');
+const minigameOverlay = document.getElementById('minigame-overlay');
+const signalNoise = document.getElementById('signal-noise');
+const backgroundMusic = document.getElementById('background-music');
+const minigameTitle = document.getElementById('minigame-title');
+const minigameInstruction = document.getElementById('minigame-instruction');
+const minigameProgress = document.getElementById('minigame-progress');
+const memorySequenceLabel = document.getElementById('minigame-memory-sequence');
+const memoryPad = document.getElementById('minigame-memory-pad');
+const puzzleBoard = document.getElementById('minigame-puzzle');
+const generatorExitButton = document.getElementById('generator-exit');
+
+// --- ÂM THANH BẰNG WEB AUDIO API ---
+const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const masterGain = AudioCtx.createGain();
+masterGain.gain.value = 0.6;
+masterGain.connect(AudioCtx.destination);
+
+async function startBackgroundMusic() {
+    try {
+        await backgroundMusic.play();
+        const toggle = document.getElementById('music-toggle');
+        toggle.innerText = 'Tắt nhạc';
+        toggle.setAttribute('aria-pressed', 'true');
+        document.getElementById('music-status').innerText = '';
+    } catch (error) {
+        document.getElementById('music-status').innerText = `Không phát được nhạc: ${error.message}`;
+    }
+}
+
+function playSound(type) {
+    if (AudioCtx.state === 'suspended') AudioCtx.resume();
+    const osc = AudioCtx.createOscillator();
+    const gain = AudioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(masterGain);
+
+    if (type === 'beep') {
+        osc.frequency.setValueAtTime(700, AudioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, AudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, AudioCtx.currentTime + 0.08);
+        osc.start(); osc.stop(AudioCtx.currentTime + 0.08);
+    } else if (type === 'jumpscare') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(120, AudioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(550, AudioCtx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.25, AudioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.001, AudioCtx.currentTime + 0.5);
+        osc.start(); osc.stop(AudioCtx.currentTime + 0.5);
+    } else if (type === 'win') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, AudioCtx.currentTime);
+        osc.frequency.setValueAtTime(660, AudioCtx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.15, AudioCtx.currentTime);
+        osc.start(); osc.stop(AudioCtx.currentTime + 0.4);
+    } else if (type === 'noise') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(180, AudioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(55, AudioCtx.currentTime + 0.22);
+        gain.gain.setValueAtTime(0.12, AudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, AudioCtx.currentTime + 0.24);
+        osc.start(); osc.stop(AudioCtx.currentTime + 0.24);
+    } else if (type === 'search') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, AudioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(120, AudioCtx.currentTime + 0.16);
+        gain.gain.setValueAtTime(0.08, AudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, AudioCtx.currentTime + 0.18);
+        osc.start(); osc.stop(AudioCtx.currentTime + 0.18);
+    }
+}
+
+function drawComputerIcon(x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = '#313a3f';
+    ctx.fillRect(-9, -7, 18, 12);
+    ctx.fillStyle = '#142d30';
+    ctx.fillRect(-7, -5, 14, 8);
+    ctx.fillStyle = '#6bf0dc';
+    ctx.fillRect(-5, -3, 2, 1);
+    ctx.fillRect(-1, -1, 5, 1);
+    ctx.fillStyle = '#888';
+    ctx.fillRect(-2, 5, 4, 2);
+    ctx.fillRect(-5, 7, 10, 2);
+    ctx.restore();
+}
+
+function drawClosetIcon(x, y, occupied = false) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = '#26392a';
+    ctx.fillRect(-7, -9, 14, 18);
+    ctx.fillStyle = occupied ? '#39de66' : '#267d40';
+    ctx.fillRect(-5, -7, 10, 14);
+    ctx.strokeStyle = '#a9f4b6';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-5.5, -7.5, 11, 15);
+    ctx.fillStyle = '#d0bc8f';
+    ctx.fillRect(2, -1, 1, 2);
+    ctx.fillStyle = '#14351d';
+    ctx.fillRect(-3, -5, 1, 10);
+    ctx.fillRect(0, -5, 1, 10);
+    ctx.restore();
+}
+
+// --- BẢN ĐỒ VÀ SPRITE ---
+const mapImage = new Image();
+mapImage.src = 'fnaf map.jpg';
+const guardChoices = Array.from({ length: 5 }, (_, index) => `guard-${index + 1}`);
+const spriteImages = {
+    guard: new Image(),
+    freddy: new Image(),
+    bonnie: new Image(),
+    chica: new Image(),
+    foxy: new Image(),
+    puppet: new Image(),
+    ...Object.fromEntries(Array.from({ length: 5 }, (_, index) => [`guard-${index + 1}`, new Image()]))
+};
+spriteImages.guard.src = 'assets/sprites/guard-1.png';
+spriteImages.freddy.src = 'assets/sprites/freddy.png';
+spriteImages.bonnie.src = 'assets/sprites/bonnie.png';
+spriteImages.chica.src = 'assets/sprites/chica.png';
+spriteImages.foxy.src = 'assets/sprites/foxy.png';
+spriteImages.puppet.src = 'assets/sprites/puppet.png';
+guardChoices.forEach(character => { spriteImages[character].src = `assets/sprites/${character}.png`; });
+
+const MAP_WIDTH = 640;
+const MAP_HEIGHT = 644;
+const VIEW_WIDTH = canvas.width;
+const VIEW_HEIGHT = canvas.height;
+const CAMERA_ZOOM = 4;
+const PLAYER_WIDTH = 14;
+const PLAYER_HEIGHT = 20;
+let mapPixels = null;
+const generators = [
+    { x: 145, y: 278, fixed: false, name: 'Máy phát bàn ăn phía tây' },
+    { x: 280, y: 278, fixed: false, name: 'Máy phát bàn ăn trung tâm' },
+    { x: 420, y: 278, fixed: false, name: 'Máy phát bàn ăn phía đông' },
+    { x: 280, y: 468, fixed: false, name: 'Máy phát cuối phòng ăn' },
+    { x: 100, y: 370, fixed: false, name: 'Máy phát hành lang phía tây' },
+    { x: 500, y: 370, fixed: false, name: 'Máy phát hành lang phía đông' },
+    { x: 350, y: 480, fixed: false, name: 'Máy phát cuối hành lang phía nam' },
+    { x: 130, y: 500, fixed: false, name: 'Máy phát phòng lưu trữ phía tây' },
+    { x: 200, y: 370, fixed: false, name: 'Máy phát hành lang giữa' },
+    { x: 400, y: 370, fixed: false, name: 'Máy phát kho phía đông' },
+    { x: 370, y: 430, fixed: false, name: 'Máy phát hành lang dưới phía đông' },
+    { x: 460, y: 520, fixed: false, name: 'Máy phát khu bếp' },
+    { x: 330, y: 400, fixed: false, name: 'Máy phát kho giữa' }
+];
+const computer = { x: 267, y: 596 };
+const officeDoors = [
+    { name: 'Cổng trái', x: 245, y: 610, width: 72, height: 18, closedUntil: 0 },
+    { name: 'Cổng phải', x: 315, y: 610, width: 72, height: 18, closedUntil: 0 }
+];
+
+function getNearbyOfficeDoor(x, y, now = Date.now()) {
+    const nearby = officeDoors
+        .filter(door => Math.hypot(x - door.x, y - door.y) < 52)
+        .sort((first, second) => Math.hypot(x - first.x, y - first.y) - Math.hypot(x - second.x, y - second.y));
+    return nearby.find(door => door.closedUntil <= now) || nearby[0] || null;
+}
+const closets = [
+    { x: 35, y: 180 }, { x: 125, y: 180 }, { x: 335, y: 180 },
+    { x: 440, y: 180 }, { x: 525, y: 240 }, { x: 530, y: 390 },
+    { x: 500, y: 450 }, { x: 235, y: 535 }, { x: 385, y: 540 },
+    { x: 210, y: 585 }, { x: 330, y: 590 }
+];
+const storageCabinets = [
+    { x: 80, y: 190, loot: 'hammer', looted: false },
+    { x: 470, y: 185, loot: 'battery', looted: false },
+    { x: 520, y: 330, loot: 'battery', looted: false },
+    { x: 515, y: 420, loot: 'battery', looted: false },
+    { x: 200, y: 545, loot: 'battery', looted: false },
+    { x: 355, y: 560, loot: 'battery', looted: false },
+    { x: 420, y: 550, loot: 'battery', looted: false }
+];
+const CAMERA_ZONES = [
+    { name: 'Sân khấu', x: 280, y: 155 },
+    { name: 'Phòng ăn', x: 280, y: 300 },
+    { name: 'Hành lang tây', x: 110, y: 390 },
+    { name: 'Hành lang đông', x: 500, y: 390 },
+    { name: 'Khu bếp', x: 430, y: 520 }
+];
+const NAV_CELL_SIZE = 4;
+const DIFFICULTIES = {
+    easy: { startMinute: 0, durationMinutes: 7 * 60, generators: 3, powerDurationMs: 180000, patrolSpeed: 10, chaseSpeed: 28, pathInterval: 1000, flashlightDrain: 8, hideMinSeconds: 19, hideMaxSeconds: 20, heartbeatWindow: 82, generatorLockoutMs: 5000, memoryLength: 3, puzzleMoves: 4, puzzleTimeSeconds: 40, computerDrain: 0, camerasNeedPower: false },
+    normal: { startMinute: 22 * 60, durationMinutes: 9 * 60, generators: 5, powerDurationMs: 60000, patrolSpeed: 15, chaseSpeed: 42, pathInterval: 650, flashlightDrain: 15, hideMinSeconds: 17, hideMaxSeconds: 19, heartbeatWindow: 58, generatorLockoutMs: 5000, memoryLength: 4, puzzleMoves: 6, puzzleTimeSeconds: 32, computerDrain: 0, camerasNeedPower: false },
+    hard: { startMinute: 21 * 60, durationMinutes: 10 * 60 + 30, generators: 8, powerDurationMs: 30000, patrolSpeed: 19, chaseSpeed: 56, pathInterval: 420, flashlightDrain: 24, hideMinSeconds: 15, hideMaxSeconds: 17, heartbeatWindow: 34, generatorLockoutMs: 5000, memoryLength: 5, puzzleMoves: 9, puzzleTimeSeconds: 24, computerDrain: 25, camerasNeedPower: true }
+};
+const MINIGAME_TIMEOUT_MS = 30000;
+
+function getRoundDuration() {
+    return DIFFICULTIES[selectedDifficulty].durationMinutes * 1000;
+}
+
+function formatGameClock(elapsedMs) {
+    const totalMinutes = (DIFFICULTIES[selectedDifficulty].startMinute + Math.floor(elapsedMs / 1000)) % (24 * 60);
+    const hour24 = Math.floor(totalMinutes / 60);
+    const hour12 = hour24 % 12 || 12;
+    const suffix = hour24 < 12 ? 'AM' : 'PM';
+    return `${String(hour12).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')} ${suffix}`;
+}
+
+function makeNoise(x, y, durationMs = 14000) {
+    soundTarget = { x, y, expiresAt: Date.now() + durationMs };
+    playSound('noise');
+}
+
+function showJumpscare(animatronicType = 'freddy') {
+    jumpscareImage.src = spriteImages[animatronicType]?.src || spriteImages.freddy.src;
+    jumpscareOverlay.classList.add('active');
+    jumpscareUntil = Date.now() + 1300;
+    playSound('jumpscare');
+    window.setTimeout(() => {
+        if (Date.now() >= jumpscareUntil) jumpscareOverlay.classList.remove('active');
+    }, 1350);
+}
+
+let generatorsFixed = 0;
+let hasHammer = false;
+let computerPower = 100;
+let mapLightsOn = true;
+let lightPowerEndsAt = 0;
+let activeCameraIndex = 0;
+let minigameType = 'generator';
+let heartbeatPlayerId = 0;
+let roundStartedAt = 0;
+let lastUpdateAt = Date.now();
+let heartbeatPointer = 0;
+let heartbeatDirection = 1;
+let gameWon = false;
+let gameOver = false;
+let gameStarted = false;
+let menuScreen = 'home';
+let selectedMode = 'solo';
+let selectedDifficulty = 'normal';
+let selectedGuard = 'guard-1';
+let requiredGeneratorCount = DIFFICULTIES.normal.generators;
+let baseGeneratorCount = DIFFICULTIES.normal.generators;
+let lastNotice = '';
+let lastNoticeUntil = 0;
+let soloRoundNumber = 1;
+let soundTarget = null;
+let jumpscareUntil = 0;
+
+// Trạng thái Minigame
+let minigameActive = false;
+let currentGeneratorIndex = -1;
+let minigamePointerPos = 0;
+let minigameSpeed = 3.5;
+let minigameSuccessCount = 0;
+let minigamePlayerId = 0;
+let generatorMisses = 0;
+let generatorBlockedUntil = 0;
+let memorySequence = [];
+let memoryInput = [];
+let memoryVisibleUntil = 0;
+let puzzleTiles = [];
+let puzzleDeadlineAt = 0;
+let minigameDeadlineAt = 0;
+let generatorMemoryOrder = 0;
+const MEMORY_COLORS = ['#e64c4c', '#e5b83f', '#378bd1', '#52bb69'];
+let renderedPuzzleState = null;
+
+function createPlayer(id, x, y) {
+    return {
+        id,
+        name: `player ${id}`,
+        character: id === 1 ? selectedGuard : 'guard-1',
+        x, y,
+        color: `hsl(${(id * 47 + 195) % 360} 72% 62%)`,
+        isDead: false,
+        hiddenInCloset: false,
+        hideStartedAt: 0,
+        hideNextMinigameAt: 0,
+        hideMinigameActive: false,
+        closetCaughtUntil: 0,
+        facingX: 0,
+        facingY: 1,
+        cameraWatching: false,
+        cameraIndex: 0,
+        battery: 100,
+        flashlightOn: false
+    };
+}
+
+const players = [createPlayer(1, 267, 620)];
+const PLAYER_SPAWNS = [
+    [235, 620], [255, 620], [275, 620], [295, 620],
+    [315, 620], [335, 620], [245, 620], [325, 620]
+];
+let localPlayerId = 1;
+let room = null;
+const remoteInputs = {};
+let remoteActions = [];
+// --- ANIMATRONICS ---
+const animatronics = [
+    { type: 'freddy', x: 220, y: 142, dir: 1, speed: 0.45, path: [], nextPathAt: 0, targetKey: '', patrolTarget: null },
+    { type: 'bonnie', x: 252, y: 142, dir: -1, speed: 0.5, path: [], nextPathAt: 0, targetKey: '', patrolTarget: null },
+    { type: 'chica',  x: 284, y: 142, dir: 1, speed: 0.4, path: [], nextPathAt: 0, targetKey: '', patrolTarget: null },
+    { type: 'foxy',   x: 316, y: 142, dir: -1, speed: 0.55, path: [], nextPathAt: 0, targetKey: '', patrolTarget: null },
+    { type: 'puppet', x: 346, y: 142, dir: 1, speed: 0.45, path: [], nextPathAt: 0, targetKey: '', patrolTarget: null }
+];
+
+function isWalkable(x, y) {
+    if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT || !mapPixels) return false;
+    const index = (Math.floor(y) * MAP_WIDTH + Math.floor(x)) * 4;
+    const red = mapPixels[index];
+    const green = mapPixels[index + 1];
+    const blue = mapPixels[index + 2];
+    const isTabletop = red > 242 && green > 242 && blue > 238;
+    return !isTabletop && (red > 12 || green > 12 || blue > 12);
+}
+
+function canOccupy(x, y, width, height) {
+    const now = Date.now();
+    if (officeDoors.some(door => door.closedUntil > now
+        && x < door.x + door.width / 2 && x + width > door.x - door.width / 2
+        && y < door.y + door.height / 2 && y + height > door.y - door.height / 2)) return false;
+    const inset = 2;
+    return isWalkable(x + inset, y + inset)
+        && isWalkable(x + width - inset, y + inset)
+        && isWalkable(x + inset, y + height - inset)
+        && isWalkable(x + width - inset, y + height - inset);
+}
+
+const navColumns = Math.ceil((MAP_WIDTH - 20) / NAV_CELL_SIZE);
+const navRows = Math.ceil((MAP_HEIGHT - 28) / NAV_CELL_SIZE);
+const navWalkable = new Uint8Array(navColumns * navRows);
+const navParents = new Int32Array(navWalkable.length);
+const navQueue = new Int32Array(navWalkable.length);
+const navDirections = [-navColumns, navColumns, -1, 1];
+let navReady = false;
+
+function buildNavigationGrid() {
+    for (let row = 0; row < navRows; row++) {
+        for (let column = 0; column < navColumns; column++) {
+            const x = column * NAV_CELL_SIZE + 2;
+            const y = row * NAV_CELL_SIZE + 2;
+            navWalkable[row * navColumns + column] = canOccupy(x, y, 14, 21) ? 1 : 0;
+        }
+    }
+    navReady = true;
+}
+
+function nearestNavigationNode(x, y) {
+    const column = Math.max(0, Math.min(navColumns - 1, Math.round((x - 2) / NAV_CELL_SIZE)));
+    const row = Math.max(0, Math.min(navRows - 1, Math.round((y - 2) / NAV_CELL_SIZE)));
+    for (let radius = 0; radius < Math.max(navColumns, navRows); radius++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+            const dx = radius - Math.abs(dy);
+            for (const offsetX of dx === 0 ? [0] : [-dx, dx]) {
+                const nextColumn = column + offsetX;
+                const nextRow = row + dy;
+                if (nextColumn < 0 || nextColumn >= navColumns || nextRow < 0 || nextRow >= navRows) continue;
+                const node = nextRow * navColumns + nextColumn;
+                if (navWalkable[node]) return node;
+            }
+        }
+    }
+    return -1;
+}
+
+function findHuntPath(bot, targetX, targetY) {
+    const start = nearestNavigationNode(bot.x, bot.y);
+    const goal = nearestNavigationNode(targetX, targetY);
+    if (start < 0 || goal < 0 || start === goal) return [];
+
+    navParents.fill(-1);
+    let head = 0;
+    let tail = 0;
+    navQueue[tail++] = start;
+    navParents[start] = start;
+
+    while (head < tail && navParents[goal] === -1) {
+        const current = navQueue[head++];
+        for (const direction of navDirections) {
+            const next = current + direction;
+            if (next < 0 || next >= navWalkable.length || !navWalkable[next] || navParents[next] !== -1) continue;
+            if ((direction === -1 || direction === 1) && Math.floor(next / navColumns) !== Math.floor(current / navColumns)) continue;
+            const currentX = (current % navColumns) * NAV_CELL_SIZE + 2;
+            const currentY = Math.floor(current / navColumns) * NAV_CELL_SIZE + 2;
+            const nextX = (next % navColumns) * NAV_CELL_SIZE + 2;
+            const nextY = Math.floor(next / navColumns) * NAV_CELL_SIZE + 2;
+            if (!canOccupy((currentX + nextX) / 2, (currentY + nextY) / 2, 14, 21)) continue;
+            navParents[next] = current;
+            navQueue[tail++] = next;
+        }
+    }
+    if (navParents[goal] === -1) return [];
+
+    const path = [];
+    let step = goal;
+    while (step !== start) {
+        path.push({
+            x: (step % navColumns) * NAV_CELL_SIZE + 2,
+            y: Math.floor(step / navColumns) * NAV_CELL_SIZE + 2
+        });
+        step = navParents[step];
+    }
+    return path.reverse();
+}
+
+function choosePatrolTarget(bot) {
+    for (let attempt = 0; attempt < 60; attempt++) {
+        const node = Math.floor(Math.random() * navWalkable.length);
+        if (!navWalkable[node]) continue;
+        const target = {
+            x: (node % navColumns) * NAV_CELL_SIZE + 2,
+            y: Math.floor(node / navColumns) * NAV_CELL_SIZE + 2
+        };
+        if (Math.hypot(target.x - bot.x, target.y - bot.y) < 100) continue;
+        if (closets.some(closet => Math.hypot(target.x - closet.x, target.y - closet.y) < 48)) continue;
+        const path = findHuntPath(bot, target.x, target.y);
+        if (path.length >= 8) return { target, path };
+    }
+    return null;
+}
+
+function drawSprite(type, x, y, width, height) {
+    const image = spriteImages[type];
+    ctx.drawImage(image, x, y, width, height);
+}
+
+function drawGeneratorIcon(x, y, label) {
+    ctx.save();
+    ctx.translate(x - 6, y - 7);
+    ctx.fillStyle = '#20282c';
+    ctx.fillRect(1, 1, 10, 13);
+    ctx.fillStyle = '#6b777a';
+    ctx.fillRect(2, 2, 8, 4);
+    ctx.fillStyle = '#19e5ff';
+    ctx.fillRect(4, 3, 4, 1);
+    ctx.fillStyle = '#c58d43';
+    ctx.fillRect(2, 8, 2, 4);
+    ctx.fillRect(6, 8, 4, 1);
+    ctx.fillStyle = '#d4d8d8';
+    ctx.fillRect(2, 14, 2, 2);
+    ctx.fillRect(8, 14, 2, 2);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 7px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(label), 6, -1);
+    ctx.restore();
+}
+
+function drawCabinetIcon(x, y, looted = false) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = '#515a60';
+    ctx.fillRect(-7, -9, 14, 18);
+    ctx.strokeStyle = '#c3cbcf';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-6.5, -8.5, 13, 17);
+    for (let shelf = -5; shelf <= 3; shelf += 4) {
+        ctx.fillStyle = looted ? '#384047' : '#747f85';
+        ctx.fillRect(-5, shelf, 10, 3);
+        ctx.fillStyle = '#20262a';
+        ctx.fillRect(-3, shelf + 1, 4, 1);
+        ctx.fillStyle = '#d5dbdd';
+        ctx.fillRect(3, shelf + 1, 1, 1);
+    }
+    ctx.restore();
+}
+
+function drawOfficeDoor(door) {
+    const closed = door.closedUntil > Date.now();
+    const halfWidth = door.width / 2;
+    const halfHeight = door.height / 2;
+    ctx.save();
+    ctx.translate(door.x, door.y);
+    ctx.fillStyle = '#25292d';
+    ctx.fillRect(-halfWidth, -halfHeight, door.width, door.height);
+    ctx.strokeStyle = closed ? '#f25b4b' : '#86949a';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-halfWidth + 0.5, -halfHeight + 0.5, door.width - 1, door.height - 1);
+    if (closed) {
+        ctx.fillStyle = '#7b2924';
+        ctx.fillRect(-halfWidth + 3, -halfHeight + 2, door.width - 6, door.height - 4);
+        ctx.fillStyle = '#f1c40f';
+        for (let bar = -halfWidth + 7; bar < halfWidth - 3; bar += 8) {
+            ctx.fillRect(bar, -halfHeight + 3, 2, door.height - 6);
+        }
+        ctx.fillStyle = '#f25b4b';
+        ctx.fillRect(-halfWidth + 3, -halfHeight + 1, door.width - 6, 2);
+        ctx.fillRect(-halfWidth + 3, halfHeight - 3, door.width - 6, 2);
+    } else {
+        ctx.fillStyle = '#152024';
+        ctx.fillRect(-halfWidth + 4, -halfHeight + 3, door.width - 8, door.height - 6);
+        ctx.fillStyle = '#55c878';
+        ctx.fillRect(-halfWidth + 1, -halfHeight + 2, 3, door.height - 4);
+        ctx.fillRect(halfWidth - 4, -halfHeight + 2, 3, door.height - 4);
+        ctx.strokeStyle = 'rgba(140, 190, 205, 0.45)';
+        ctx.lineWidth = 1;
+        for (let bar = -halfWidth + 9; bar < halfWidth - 5; bar += 10) {
+            ctx.beginPath();
+            ctx.moveTo(bar, -halfHeight + 3);
+            ctx.lineTo(bar, halfHeight - 3);
+            ctx.stroke();
+        }
+    }
+    ctx.restore();
+}
+
+// --- INPUT & ĐIỀU KHIỂN ---
+const keys = {};
+const queuedActions = [];
+let syncInProgress = false;
+let lastSyncAt = 0;
+
+function getLocalPlayer() {
+    return players.find(player => player.id === localPlayerId);
+}
+
+function sendPlayerAction(player, action) {
+    if (room?.role === 'guest') queuedActions.push(action);
+    else applyAction(player, action);
+}
+
+function applyAction(player, action) {
+    if (!gameStarted || !player || player.isDead) return;
+    if (minigameActive && minigameDeadlineAt && Date.now() >= minigameDeadlineAt) {
+        handleMinigameTimeout();
+        return;
+    }
+    if (action === 'light') {
+        toggleFlashlight(player);
+    } else if (action === 'interact') {
+        interact(player);
+    } else if (action === 'generator-abort') {
+        if (minigameActive && minigamePlayerId === player.id && minigameType !== 'heartbeat') abortGeneratorMinigame();
+    } else if (/^memory-[0-3]$/.test(action)) {
+        if (minigameActive && minigameType === 'memory' && minigamePlayerId === player.id) submitMemoryTile(Number(action.slice(-1)));
+    } else if (/^puzzle-tile-[0-8]$/.test(action)) {
+        if (minigameActive && minigameType === 'puzzle' && minigamePlayerId === player.id) movePuzzleTile(Number(action.slice(-1)));
+    } else if (/^puzzle-(up|down|left|right)$/.test(action)) {
+        if (minigameActive && minigameType === 'puzzle' && minigamePlayerId === player.id) movePuzzle(action.slice(7));
+    } else if (action === 'camera-close') {
+        player.cameraWatching = false;
+    } else if (/^camera-[1-5]$/.test(action) && player.cameraWatching) {
+        player.cameraIndex = Number(action.slice(-1)) - 1;
+    }
+}
+
+window.addEventListener('keydown', e => {
+    const key = e.key.toLowerCase();
+    if (['w', 'a', 's', 'd', 'e', 'f', ' ', 'escape', 'r', '1', '2', '3', '4', '5', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) e.preventDefault();
+    if (keys[key]) return;
+    keys[key] = true;
+    if (!gameStarted) return;
+
+    const localPlayer = getLocalPlayer();
+    if (key === 'r' && (gameOver || gameWon) && room?.role !== 'guest') {
+        resetRound(true);
+        return;
+    }
+    if (minigameActive && minigamePlayerId === localPlayer?.id) {
+        if (key === 'escape' && minigameType !== 'heartbeat') {
+            sendPlayerAction(localPlayer, 'generator-abort');
+            return;
+        }
+        if (minigameType === 'memory' && /^[1-4]$/.test(key)) {
+            sendPlayerAction(localPlayer, `memory-${Number(key) - 1}`);
+            return;
+        }
+        const puzzleDirections = {
+            arrowup: 'puzzle-up',
+            arrowdown: 'puzzle-down',
+            arrowleft: 'puzzle-left',
+            arrowright: 'puzzle-right'
+        };
+        if (minigameType === 'puzzle' && puzzleDirections[key]) {
+            sendPlayerAction(localPlayer, puzzleDirections[key]);
+            return;
+        }
+    }
+    if (key === 'escape' && localPlayer?.cameraWatching) {
+        sendPlayerAction(localPlayer, 'camera-close');
+        return;
+    }
+    if (/^[1-5]$/.test(key) && localPlayer?.cameraWatching) {
+        sendPlayerAction(localPlayer, `camera-${key}`);
+        return;
+    }
+    if (key === 'e' || key === 'f' || key === ' ') {
+        const action = key === 'f' ? 'light' : 'interact';
+        sendPlayerAction(localPlayer, action);
+    }
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+window.addEventListener('blur', () => {
+    Object.keys(keys).forEach(key => { keys[key] = false; });
+});
+
+function playerMovement(player, input, deltaSeconds) {
+    if (player.isDead || player.hiddenInCloset || player.cameraWatching || player.closetCaughtUntil > Date.now()
+        || (minigameActive && minigamePlayerId === player.id)) return;
+    let dx = 0;
+    let dy = 0;
+    if (input.a) dx -= 108 * deltaSeconds;
+    if (input.d) dx += 108 * deltaSeconds;
+    if (input.w) dy -= 108 * deltaSeconds;
+    if (input.s) dy += 108 * deltaSeconds;
+    if (dx || dy) {
+        const magnitude = Math.hypot(dx, dy);
+        player.facingX = dx / magnitude;
+        player.facingY = dy / magnitude;
+    }
+    movePlayer(player, dx, dy);
+}
+
+function handleMinigameTimeout() {
+    if (!minigameActive || !minigameDeadlineAt || Date.now() < minigameDeadlineAt) return;
+    minigameDeadlineAt = 0;
+    if (minigameType === 'heartbeat') {
+        failHidingMinigame(players.find(player => player.id === heartbeatPlayerId));
+    } else {
+        registerGeneratorMiss('Hết 30 giây mà chưa hoàn thành minigame.');
+    }
+}
+
+function updatePlayerResources(deltaSeconds) {
+    const difficulty = DIFFICULTIES[selectedDifficulty];
+    for (const player of players) {
+        if (player.isDead) continue;
+        if (player.flashlightOn) {
+            player.battery = Math.max(0, player.battery - difficulty.flashlightDrain / 60 * deltaSeconds);
+            if (player.battery === 0) player.flashlightOn = false;
+        }
+        if (player.cameraWatching) {
+            if (difficulty.camerasNeedPower) computerPower = Math.max(0, computerPower - 3 * deltaSeconds);
+            if (!mapLightsOn || (difficulty.camerasNeedPower && computerPower === 0)) {
+                player.cameraWatching = false;
+                showNotice(!mapLightsOn ? 'Màn hình camera mất điện.' : 'Màn hình camera hết điện.');
+            }
+        }
+        if (player.hiddenInCloset && !minigameActive && Date.now() >= player.hideNextMinigameAt) {
+            startHeartbeatMinigame(player);
+        }
+    }
+    if (minigameActive && minigameType === 'memory' && memoryVisibleUntil && Date.now() >= memoryVisibleUntil) {
+        memoryVisibleUntil = 0;
+        memorySequenceLabel.hidden = true;
+        minigameInstruction.innerText = 'Ghi nhớ chuỗi màu, sau đó chọn đúng thứ tự.';
+    }
+    handleMinigameTimeout();
+    if (minigameActive && minigameType === 'puzzle' && puzzleDeadlineAt && Date.now() >= puzzleDeadlineAt) {
+        registerGeneratorMiss('Hết giờ xếp hình.');
+    }
+}
+
+function toggleFlashlight(p) {
+    if (!p.isDead && !p.hiddenInCloset && p.battery > 0) {
+        p.flashlightOn = !p.flashlightOn;
+        playSound('beep');
+    }
+}
+
+// --- GAME LOGIC ---
+function update() {
+    if (!gameStarted) return;
+    const now = Date.now();
+    const deltaSeconds = Math.min(0.05, Math.max(0, (now - lastUpdateAt) / 1000));
+    lastUpdateAt = now;
+    const localPlayer = getLocalPlayer();
+    if (!localPlayer) return;
+
+    if (room?.role === 'guest') {
+        if (!gameOver && !gameWon) playerMovement(localPlayer, keys, deltaSeconds);
+        updateUI();
+        return;
+    }
+    if (gameOver || gameWon) {
+        updateUI();
+        return;
+    }
+
+    playerMovement(localPlayer, keys, deltaSeconds);
+    for (const player of players) {
+        if (player.id === localPlayerId) continue;
+        playerMovement(player, remoteInputs[player.id] || {}, deltaSeconds);
+    }
+    remoteActions.splice(0).forEach(({ playerId, action }) => {
+        applyAction(players.find(player => player.id === playerId), action);
+    });
+
+    if (roundStartedAt && now - roundStartedAt >= getRoundDuration()) {
+        gameWon = true;
+        showNotice(`${formatGameClock(getRoundDuration())} · Đã sống sót đến sáng!`);
+        playSound('win');
+        updateUI();
+        return;
+    } else if (mapLightsOn && now >= lightPowerEndsAt) {
+        mapLightsOn = false;
+        lightPowerEndsAt = 0;
+        players.forEach(player => { player.cameraWatching = false; });
+        officeDoors.forEach(door => { door.closedUntil = 0; });
+        animatronics.forEach(bot => { bot.nextPathAt = 0; bot.path = []; });
+        showNotice('Đèn trong nhà đã tắt! Tìm và sửa máy phát để khôi phục điện.');
+    }
+
+    if (minigameActive) {
+        if (minigameType === 'heartbeat') {
+            heartbeatPointer += heartbeatDirection * minigameSpeed * deltaSeconds * 60;
+            if (heartbeatPointer > 255 || heartbeatPointer < 0) {
+                heartbeatDirection *= -1;
+                heartbeatPointer = Math.max(0, Math.min(255, heartbeatPointer));
+            }
+            document.getElementById('minigame-pointer').style.left = `${heartbeatPointer}px`;
+        } else if (minigameType === 'generator') {
+            minigamePointerPos += minigameSpeed * deltaSeconds * 60;
+            if (minigamePointerPos > 255 || minigamePointerPos < 0) {
+                minigameSpeed *= -1;
+            }
+            document.getElementById('minigame-pointer').style.left = `${minigamePointerPos}px`;
+        }
+    }
+
+    updatePlayerResources(deltaSeconds);
+    updateAnimatronics(now, deltaSeconds);
+    updateClosetAmbushes(now);
+    checkPlayerCollisions();
+    updateUI();
+}
+
+function updateAnimatronics(now, deltaSeconds) {
+    if (mapLightsOn) {
+        animatronics.forEach(bot => { bot.path = []; bot.nextPathAt = 0; });
+        return;
+    }
+    const hunting = navReady;
+    if (soundTarget && now >= soundTarget.expiresAt) soundTarget = null;
+    const audibleNoise = soundTarget && now < soundTarget.expiresAt ? soundTarget : null;
+    animatronics.forEach(bot => {
+        const targets = players.filter(player => !player.isDead && !player.hiddenInCloset);
+        const target = audibleNoise || (hunting && targets.length > 0 ? targets.reduce((nearest, player) => {
+                const distance = Math.hypot(player.x - bot.x, player.y - bot.y);
+                return distance < nearest.distance ? { player, distance } : nearest;
+            }, { player: targets[0], distance: Infinity }).player : null);
+        const targetKey = audibleNoise
+            ? `noise:${audibleNoise.x}:${audibleNoise.y}`
+            : target ? `player:${target.id}` : 'patrol';
+        if (bot.targetKey !== targetKey) {
+            bot.path = [];
+            bot.nextPathAt = 0;
+            bot.targetKey = targetKey;
+            if (targetKey !== 'patrol') bot.patrolTarget = null;
+        }
+        if (target) {
+            if (now >= bot.nextPathAt) {
+                const targetX = target.x + (audibleNoise ? 0 : PLAYER_WIDTH / 2);
+                const targetY = target.y + (audibleNoise ? 0 : PLAYER_HEIGHT / 2);
+                bot.path = findHuntPath(bot, targetX, targetY);
+                bot.nextPathAt = now + DIFFICULTIES[selectedDifficulty].pathInterval;
+            }
+        } else if (now >= bot.nextPathAt && (!bot.patrolTarget || !bot.path.length)) {
+            const patrol = choosePatrolTarget(bot);
+            bot.patrolTarget = patrol?.target || null;
+            bot.path = patrol?.path || [];
+            bot.nextPathAt = now + DIFFICULTIES[selectedDifficulty].pathInterval;
+        }
+
+        const waypoint = bot.path[0];
+        if (!waypoint) return;
+        const dx = waypoint.x - bot.x;
+        const dy = waypoint.y - bot.y;
+        const distance = Math.hypot(dx, dy);
+        const step = Math.min(
+            (target ? DIFFICULTIES[selectedDifficulty].chaseSpeed : DIFFICULTIES[selectedDifficulty].patrolSpeed) * deltaSeconds,
+            distance
+        );
+        if (distance <= step && canOccupy(waypoint.x, waypoint.y, 14, 21)) {
+            bot.x = waypoint.x;
+            bot.y = waypoint.y;
+            bot.path.shift();
+            if (!target && !bot.path.length) bot.nextPathAt = now;
+        } else {
+            let moved = false;
+            const horizontalFirst = Math.abs(dx) >= Math.abs(dy);
+            for (const horizontal of [horizontalFirst, !horizontalFirst]) {
+                const nextX = horizontal ? bot.x + Math.sign(dx) * Math.min(step, Math.abs(dx)) : bot.x;
+                const nextY = horizontal ? bot.y : bot.y + Math.sign(dy) * Math.min(step, Math.abs(dy));
+                if (nextX === bot.x && nextY === bot.y) continue;
+                if (canOccupy(nextX, nextY, 14, 21)) {
+                    bot.x = nextX;
+                    bot.y = nextY;
+                    moved = true;
+                    break;
+                }
+            }
+            if (!moved) {
+                bot.path = [];
+                bot.nextPathAt = 0;
+                if (!target) bot.patrolTarget = null;
+            }
+        }
+    });
+}
+
+function checkPlayerCollisions() {
+    animatronics.forEach(bot => {
+        players.forEach(player => {
+            if (!player.isDead && !player.hiddenInCloset && Math.hypot(
+                player.x + PLAYER_WIDTH / 2 - (bot.x + 7),
+                player.y + PLAYER_HEIGHT / 2 - (bot.y + 11)
+            ) < 17) {
+                player.isDead = true;
+                player.cameraWatching = false;
+                player.hiddenInCloset = false;
+                if (player.id === localPlayerId) showJumpscare(bot.type);
+                checkGameOver();
+            }
+        });
+    });
+}
+
+function updateClosetAmbushes(now) {
+    for (const player of players) {
+        if (player.isDead || !player.closetCaughtUntil || now < player.closetCaughtUntil) continue;
+        const nearest = animatronics.reduce((closest, bot) => {
+            const distance = Math.hypot(bot.x - player.closetCaughtX, bot.y - player.closetCaughtY);
+            return distance < closest.distance ? { bot, distance } : closest;
+        }, { bot: animatronics[0], distance: Infinity });
+        nearest.bot.x = player.closetCaughtX;
+        nearest.bot.y = player.closetCaughtY;
+        player.closetCaughtUntil = 0;
+        player.isDead = true;
+        player.hiddenInCloset = false;
+        if (player.id === localPlayerId) showJumpscare(nearest.bot.type);
+        checkGameOver();
+    }
+}
+
+function movePlayer(p, dx, dy) {
+    const newX = p.x + dx;
+    const newY = p.y + dy;
+    if (canOccupy(newX, p.y, PLAYER_WIDTH, PLAYER_HEIGHT)) p.x = newX;
+    if (canOccupy(p.x, newY, PLAYER_WIDTH, PLAYER_HEIGHT)) p.y = newY;
+}
+
+function interact(p) {
+    if (p.isDead) return;
+    if (minigameActive) {
+        if (minigameType === 'heartbeat' || (currentGeneratorIndex >= 0 && Math.hypot(p.x + PLAYER_WIDTH / 2 - generators[currentGeneratorIndex].x, p.y + PLAYER_HEIGHT / 2 - generators[currentGeneratorIndex].y) < 40)) {
+            checkMinigameHit(p);
+        }
+        return;
+    }
+    const playerX = p.x + PLAYER_WIDTH / 2;
+    const playerY = p.y + PLAYER_HEIGHT / 2;
+    if (p.cameraWatching) {
+        p.cameraWatching = false;
+        showNotice('Đã rời màn hình camera.');
+        return;
+    }
+    const closet = closets.find(item => Math.hypot(playerX - item.x, playerY - item.y) < 20);
+    if (closet) {
+        p.hiddenInCloset = !p.hiddenInCloset;
+        p.hideStartedAt = p.hiddenInCloset ? Date.now() : 0;
+        p.hideNextMinigameAt = p.hiddenInCloset ? getNextHideMinigameAt() : 0;
+        p.hideMinigameActive = false;
+        p.flashlightOn = false;
+        showNotice(p.hiddenInCloset ? 'Đã trốn trong tủ. Nhấn E để bước ra.' : 'Đã rời khỏi tủ trốn.');
+        if (p.hiddenInCloset) soundTarget = null;
+        return;
+    }
+    const door = getNearbyOfficeDoor(playerX, playerY);
+    const inComputerRange = Math.hypot(playerX - computer.x, playerY - computer.y) < 40;
+    if (door && (!inComputerRange || door.closedUntil <= Date.now())) {
+        if (!mapLightsOn) {
+            showNotice('Không thể đóng cửa khi mất điện.');
+        } else if (door.closedUntil > Date.now()) {
+            showNotice(`${door.name} đang đóng · ${Math.ceil((door.closedUntil - Date.now()) / 1000)} giây nữa sẽ mở.`);
+        } else {
+            door.closedUntil = Date.now() + 10000;
+            showNotice(`${door.name} đã đóng trong 10 giây.`);
+        }
+        return;
+    }
+    if (inComputerRange) {
+        const difficulty = DIFFICULTIES[selectedDifficulty];
+        if (!mapLightsOn) {
+            showNotice('Màn hình camera mất điện. Không thể xem khi đèn trong nhà đã tắt.');
+            return;
+        }
+        if (difficulty.camerasNeedPower && computerPower < difficulty.computerDrain) {
+            showNotice('Máy tính hết điện.');
+            return;
+        }
+        if (difficulty.camerasNeedPower) {
+            computerPower -= difficulty.computerDrain;
+        }
+        p.cameraWatching = true;
+        p.cameraIndex = activeCameraIndex;
+        showNotice(difficulty.camerasNeedPower ? 'Camera bật · hao điện.' : 'Camera bật.');
+        playSound('beep');
+        return;
+    }
+    const cabinet = storageCabinets.find(item => Math.hypot(playerX - item.x, playerY - item.y) < 21);
+    if (cabinet) {
+        if (cabinet.looted) {
+            showNotice('Tủ đồ này đã trống.');
+            return;
+        }
+        cabinet.looted = true;
+        if (cabinet.loot === 'hammer' && !hasHammer) {
+            hasHammer = true;
+            showNotice(`${p.name} tìm thấy búa sửa chữa trong tủ đồ.`);
+        } else {
+            const previousBattery = p.battery;
+            p.battery = Math.min(100, p.battery + 40);
+            showNotice(previousBattery < 100
+                ? `${p.name} tìm thấy pin đèn pin trong tủ đồ.`
+                : `${p.name} lục tủ đồ nhưng pin đã đầy.`);
+        }
+        return;
+    }
+    const generatorIndex = generators.findIndex((item, index) => index < requiredGeneratorCount && !item.fixed && Math.hypot(playerX - item.x, playerY - item.y) < 20);
+
+    if (generatorIndex >= 0) {
+        if (Date.now() < generatorBlockedUntil) {
+            showNotice(`Máy phát quá tải. Chờ ${Math.ceil((generatorBlockedUntil - Date.now()) / 1000)} giây.`);
+        } else if (!hasHammer) showNotice('Cần nhặt búa sửa chữa trước khi sửa máy phát.');
+        else startMinigame(generatorIndex, p);
+    }
+}
+
+function getNextHideMinigameAt() {
+    const difficulty = DIFFICULTIES[selectedDifficulty];
+    const seconds = difficulty.hideMinSeconds + Math.random() * (difficulty.hideMaxSeconds - difficulty.hideMinSeconds);
+    return Date.now() + seconds * 1000;
+}
+
+function updateMinigameDisplay() {
+    const isGenerator = minigameType !== 'heartbeat';
+    minigameOverlay.style.display = minigameActive ? 'flex' : 'none';
+    document.getElementById('minigame-bar').style.display =
+        minigameType === 'generator' || minigameType === 'heartbeat' ? 'block' : 'none';
+    memoryPad.hidden = minigameType !== 'memory';
+    puzzleBoard.hidden = minigameType !== 'puzzle';
+    generatorExitButton.hidden = !isGenerator;
+    memorySequenceLabel.hidden = minigameType !== 'memory' || !memoryVisibleUntil;
+    memoryPad.querySelectorAll('button').forEach(button => {
+        button.disabled = minigameType !== 'memory' || memoryVisibleUntil > Date.now() || minigamePlayerId !== localPlayerId;
+    });
+}
+
+function startMemoryChallenge() {
+    const length = DIFFICULTIES[selectedDifficulty].memoryLength;
+    memorySequence = Array.from({ length }, () => Math.floor(Math.random() * MEMORY_COLORS.length));
+    memoryInput = [];
+    memoryVisibleUntil = Date.now() + (selectedDifficulty === 'easy' ? 2100 : selectedDifficulty === 'normal' ? 1600 : 1100);
+    const revealDeadline = memoryVisibleUntil;
+    memorySequenceLabel.innerText = `Ghi nhớ: ${memorySequence.map(index => index + 1).join(' · ')}`;
+    memoryPad.querySelectorAll('button').forEach((button, index) => {
+        button.style.backgroundColor = MEMORY_COLORS[index];
+        button.disabled = true;
+    });
+    minigameInstruction.innerText = 'Ghi nhớ chuỗi màu. Sau đó chọn lại đúng thứ tự.';
+    window.setTimeout(() => {
+        if (!minigameActive || minigameType !== 'memory' || memoryVisibleUntil !== revealDeadline) return;
+        memoryVisibleUntil = 0;
+        memorySequenceLabel.hidden = true;
+        memoryPad.querySelectorAll('button').forEach(button => { button.disabled = minigamePlayerId !== localPlayerId; });
+        minigameInstruction.innerText = 'Chọn các màu theo đúng thứ tự đã ghi nhớ.';
+    }, Math.max(0, memoryVisibleUntil - Date.now()));
+}
+
+function renderPuzzleBoard() {
+    const stateKey = `${puzzleTiles.join(',')}:${minigamePlayerId}:${localPlayerId}`;
+    if (stateKey === renderedPuzzleState) return;
+    renderedPuzzleState = stateKey;
+    puzzleBoard.replaceChildren();
+    puzzleTiles.forEach((tile, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.innerText = tile ? String(tile) : '';
+        button.classList.toggle('empty', tile === 0);
+        button.disabled = tile === 0 || minigamePlayerId !== localPlayerId;
+        button.setAttribute('aria-label', tile ? `Di chuyển ô ${tile}` : 'Ô trống');
+        button.addEventListener('click', () => {
+            const player = getLocalPlayer();
+            if (player) sendPlayerAction(player, `puzzle-tile-${index}`);
+        });
+        puzzleBoard.appendChild(button);
+    });
+}
+
+function shufflePuzzle() {
+    puzzleTiles = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+    let empty = 8;
+    let previous = -1;
+    for (let step = 0; step < DIFFICULTIES[selectedDifficulty].puzzleMoves; step++) {
+        const neighbours = [empty - 3, empty + 3, empty % 3 ? empty - 1 : -1, empty % 3 < 2 ? empty + 1 : -1]
+            .filter(index => index >= 0 && index < 9 && index !== previous);
+        const next = neighbours[Math.floor(Math.random() * neighbours.length)];
+        [puzzleTiles[empty], puzzleTiles[next]] = [puzzleTiles[next], puzzleTiles[empty]];
+        previous = empty;
+        empty = next;
+    }
+    puzzleDeadlineAt = Date.now() + DIFFICULTIES[selectedDifficulty].puzzleTimeSeconds * 1000;
+    renderPuzzleBoard();
+    minigameInstruction.innerText = 'Xếp các ô từ 1 đến 8, ô trống ở góc dưới bên phải.';
+}
+
+function startGeneratorChallenge() {
+    if (!minigameActive) return;
+    minigamePointerPos = 0;
+    heartbeatPointer = 0;
+    heartbeatDirection = 1;
+    if (minigameType === 'generator') {
+        minigameTitle.innerText = 'KHỞI ĐỘNG MÁY PHÁT';
+        minigameInstruction.innerText = 'Nhấn E / Space khi vạch đỏ nằm trong vùng xanh.';
+        minigameSpeed = selectedDifficulty === 'easy' ? 2.7 : selectedDifficulty === 'normal' ? 3.8 : 5;
+        memoryVisibleUntil = 0;
+    } else if (minigameType === 'memory') {
+        minigameTitle.innerText = 'SỬA MẠCH · TRÍ NHỚ';
+        startMemoryChallenge();
+    } else {
+        minigameTitle.innerText = 'SỬA MẠCH · XẾP HÌNH';
+        shufflePuzzle();
+    }
+    minigameProgress.innerText = `Tiến độ sửa máy: ${minigameSuccessCount}/3`;
+    updateMinigameDisplay();
+}
+
+function abortGeneratorMinigame() {
+    if (!minigameActive || minigameType === 'heartbeat') return;
+    minigameActive = false;
+    minigamePlayerId = 0;
+    minigameDeadlineAt = 0;
+    currentGeneratorIndex = -1;
+    puzzleDeadlineAt = 0;
+    memoryVisibleUntil = 0;
+    updateMinigameDisplay();
+    showNotice('Đã rời minigame. Máy phát vẫn chưa được sửa.');
+}
+
+function startMinigame(generatorIndex, player) {
+    minigameActive = true;
+    minigamePlayerId = player.id;
+    minigameDeadlineAt = Date.now() + MINIGAME_TIMEOUT_MS;
+    minigameType = ['generator', 'memory', 'puzzle'][generatorMemoryOrder % 3];
+    generatorMemoryOrder++;
+    currentGeneratorIndex = generatorIndex;
+    minigameSuccessCount = 0;
+    makeNoise(player.x + PLAYER_WIDTH / 2, player.y + PLAYER_HEIGHT / 2);
+    showNotice(`${player.name} bắt đầu sửa máy phát. Tiếng động có thể thu hút animatronic!`);
+    startGeneratorChallenge();
+}
+
+function startHeartbeatMinigame(player) {
+    if (minigameActive) return;
+    minigameActive = true;
+    minigameType = 'heartbeat';
+    minigameDeadlineAt = Date.now() + MINIGAME_TIMEOUT_MS;
+    heartbeatPlayerId = player.id;
+    minigamePlayerId = player.id;
+    player.hideMinigameActive = true;
+    currentGeneratorIndex = -1;
+    minigameSuccessCount = 0;
+    heartbeatPointer = Math.random() * 255;
+    heartbeatDirection = 1;
+    minigameSpeed = selectedDifficulty === 'easy' ? 3.3 : selectedDifficulty === 'normal' ? 4.8 : 6.5;
+    minigameTitle.innerText = 'NHỊP TIM · GIỮ BÌNH TĨNH';
+    minigameInstruction.innerText = 'Nhấn E / Space đúng nhịp 3 lần để tiếp tục ẩn nấp.';
+    document.getElementById('minigame-target').style.width = `${DIFFICULTIES[selectedDifficulty].heartbeatWindow}px`;
+    document.getElementById('minigame-target').style.left = `${128 - DIFFICULTIES[selectedDifficulty].heartbeatWindow / 2}px`;
+    minigameProgress.innerText = 'Nhịp tim: 0/3';
+    showNotice(`${player.name}, nhịp tim đang dồn dập!`);
+    updateMinigameDisplay();
+}
+
+function finishGeneratorChallenge() {
+    minigameSuccessCount++;
+    if (minigameSuccessCount >= 3) {
+        const repairedGenerator = generators[currentGeneratorIndex];
+        repairedGenerator.fixed = true;
+        generatorsFixed = generators.filter(generator => generator.fixed).length;
+        mapLightsOn = true;
+        lightPowerEndsAt = Date.now() + DIFFICULTIES[selectedDifficulty].powerDurationMs;
+        const player = players.find(item => item.id === minigamePlayerId);
+        minigameActive = false;
+        minigameDeadlineAt = 0;
+        currentGeneratorIndex = -1;
+        minigamePlayerId = 0;
+        generatorMisses = 0;
+        puzzleDeadlineAt = 0;
+        updateMinigameDisplay();
+        showNotice(`${player?.name || 'Người chơi'} đã sửa xong ${repairedGenerator.name}.`);
+        updateUI();
+        return;
+    }
+    minigameProgress.innerText = `Tiến độ sửa máy: ${minigameSuccessCount}/3`;
+    startGeneratorChallenge();
+}
+
+function registerGeneratorMiss(message) {
+    if (!minigameActive || minigameType === 'heartbeat') return;
+    generatorMisses++;
+    if (generatorMisses >= 3) {
+        generatorMisses = 0;
+        generatorBlockedUntil = Date.now() + DIFFICULTIES[selectedDifficulty].generatorLockoutMs;
+        minigameActive = false;
+        minigamePlayerId = 0;
+        minigameDeadlineAt = 0;
+        currentGeneratorIndex = -1;
+        puzzleDeadlineAt = 0;
+        updateMinigameDisplay();
+        showNotice(`${message} Trượt 3 lần: máy phát khóa trong 5 giây.`);
+        return;
+    }
+    showNotice(`${message} Trượt ${generatorMisses}/3 lần trước khi khóa máy.`);
+    minigameDeadlineAt = Date.now() + MINIGAME_TIMEOUT_MS;
+    minigameProgress.innerText = `Trượt ${generatorMisses}/3 · Sửa máy ${minigameSuccessCount}/3`;
+    if (minigameType === 'memory') startMemoryChallenge();
+    else if (minigameType === 'puzzle') shufflePuzzle();
+    else {
+        minigamePointerPos = 0;
+        minigameSpeed *= -1;
+    }
+    minigameInstruction.innerText = `${message} Trượt ${generatorMisses}/3 lần trước khi khóa máy. Thử lại!`;
+    updateMinigameDisplay();
+}
+
+function submitMemoryTile(index) {
+    if (memoryVisibleUntil || !memorySequence.length) return;
+    memoryInput.push(index);
+    const position = memoryInput.length - 1;
+    if (memorySequence[position] !== index) {
+        memoryInput = [];
+        registerGeneratorMiss('Sai chuỗi màu.');
+        return;
+    }
+    playSound('beep');
+    if (memoryInput.length === memorySequence.length) finishGeneratorChallenge();
+    else minigameProgress.innerText = `Đúng màu ${memoryInput.length}/${memorySequence.length} · Máy ${minigameSuccessCount}/3`;
+}
+
+function movePuzzleTile(index) {
+    if (!puzzleTiles.length) return;
+    const empty = puzzleTiles.indexOf(0);
+    if (Math.abs(index - empty) === 3 || (Math.floor(index / 3) === Math.floor(empty / 3) && Math.abs(index - empty) === 1)) {
+        [puzzleTiles[index], puzzleTiles[empty]] = [puzzleTiles[empty], puzzleTiles[index]];
+        renderPuzzleBoard();
+        if (puzzleTiles.every((tile, position) => tile === (position + 1) % 9)) finishGeneratorChallenge();
+    }
+}
+
+function movePuzzle(direction) {
+    const empty = puzzleTiles.indexOf(0);
+    const row = Math.floor(empty / 3);
+    const column = empty % 3;
+    const index = direction === 'up' ? (row < 2 ? empty + 3 : -1)
+        : direction === 'down' ? (row > 0 ? empty - 3 : -1)
+            : direction === 'left' ? (column < 2 ? empty + 1 : -1)
+                : column > 0 ? empty - 1 : -1;
+    if (index >= 0) movePuzzleTile(index);
+}
+
+function failHidingMinigame(player) {
+    if (!player || !player.hiddenInCloset) return;
+    const now = Date.now();
+    player.hiddenInCloset = false;
+    player.hideMinigameActive = false;
+    player.hideNextMinigameAt = 0;
+    player.closetCaughtX = player.x + PLAYER_WIDTH / 2;
+    player.closetCaughtY = player.y + PLAYER_HEIGHT / 2;
+    player.closetCaughtUntil = now + (selectedDifficulty === 'easy' ? 6000 : selectedDifficulty === 'normal' ? 4200 : 2800);
+    minigameActive = false;
+    minigameDeadlineAt = 0;
+    minigamePlayerId = 0;
+    heartbeatPlayerId = 0;
+    updateMinigameDisplay();
+    makeNoise(player.closetCaughtX, player.closetCaughtY);
+    showNotice(`${player.name} hụt nhịp! Animatronic lôi bạn khỏi tủ.`);
+}
+
+function checkMinigameHit(player = getLocalPlayer()) {
+    if (minigameType === 'heartbeat') {
+        if (player?.id !== heartbeatPlayerId) return;
+        const windowWidth = DIFFICULTIES[selectedDifficulty].heartbeatWindow;
+        const success = heartbeatPointer >= 128 - windowWidth / 2 && heartbeatPointer <= 128 + windowWidth / 2;
+        if (!success) {
+            failHidingMinigame(players.find(item => item.id === heartbeatPlayerId));
+            return;
+        }
+        minigameSuccessCount++;
+        playSound('beep');
+        minigameProgress.innerText = `Nhịp tim: ${minigameSuccessCount}/3`;
+        if (minigameSuccessCount >= 3) {
+            minigameActive = false;
+            minigameDeadlineAt = 0;
+            minigamePlayerId = 0;
+            const hidingPlayer = players.find(item => item.id === heartbeatPlayerId && item.hiddenInCloset && !item.isDead);
+            if (hidingPlayer) {
+                hidingPlayer.hideStartedAt = Date.now();
+                hidingPlayer.hideNextMinigameAt = getNextHideMinigameAt();
+                hidingPlayer.hideMinigameActive = false;
+            }
+            heartbeatPlayerId = 0;
+            updateMinigameDisplay();
+            showNotice('Nhịp tim đã ổn định. Bạn có thể tiếp tục trốn.');
+        }
+        return;
+    }
+    if (minigameType !== 'generator') return;
+    if (minigamePointerPos >= 100 && minigamePointerPos <= 150) finishGeneratorChallenge();
+    else registerGeneratorMiss('Trượt nhịp sửa máy.');
+}
+
+function checkGameOver() {
+    if (players.length && players.every(player => player.isDead)) {
+        gameOver = true;
+        gameWon = false;
+        showNotice('Không còn ai sống sót.');
+    }
+}
+
+function showNotice(message) {
+    lastNotice = message;
+    lastNoticeUntil = Date.now() + 4500;
+}
+
+function updateUI() {
+    const localPlayer = getLocalPlayer();
+    mobileControls.hidden = !gameStarted;
+    mobileCameraControls.hidden = !gameStarted || !localPlayer?.cameraWatching;
+    if (!gameStarted) {
+        interactionHint.innerText = '';
+        document.getElementById('game-info').hidden = true;
+        eventNotice.hidden = true;
+        document.getElementById('controls-hint').hidden = menuScreen !== 'lobby';
+        return;
+    }
+    const now = Date.now();
+    const elapsed = Math.min(getRoundDuration(), Math.max(0, now - roundStartedAt));
+    const timeLabel = formatGameClock(elapsed);
+    let hint = '';
+    if (!localPlayer) hint = '';
+    else if (gameWon) hint = 'Bạn đã sống sót đến bình minh!';
+    else if (gameOver) hint = 'Không còn ai sống sót.';
+    else if (localPlayer.isDead) hint = 'Bạn đã bị bắt · Đang chờ đồng đội.';
+    else if (minigameActive && minigameType === 'heartbeat') hint = 'Nhịp tim · Nhấn E / Space đúng lúc!';
+    else if (minigameActive && minigameType === 'memory') hint = 'Trí nhớ · Chọn đúng chuỗi màu (phím 1–4). Esc để rời sửa máy.';
+    else if (minigameActive && minigameType === 'puzzle') hint = 'Xếp hình · Dùng phím mũi tên hoặc bấm ô sát ô trống. Esc để rời sửa máy.';
+    else if (localPlayer.cameraWatching) hint = `CAM ${localPlayer.cameraIndex + 1}/${CAMERA_ZONES.length} · ${CAMERA_ZONES[localPlayer.cameraIndex].name} · 1–5 đổi · E/Esc thoát${DIFFICULTIES[selectedDifficulty].camerasNeedPower ? ` · Điện máy tính ${Math.floor(computerPower)}%` : ''}`;
+    else if (localPlayer.hiddenInCloset) hint = 'Đang trốn trong tủ · Nhấn E để bước ra.';
+    else if (minigameActive && minigameType === 'generator') hint = 'Khởi động máy · Nhấn E / Space khi vạch đỏ vào vùng xanh. Esc để thoát.';
+    else {
+        const x = localPlayer.x + PLAYER_WIDTH / 2;
+        const y = localPlayer.y + PLAYER_HEIGHT / 2;
+        const generator = generators.find((item, index) => index < requiredGeneratorCount && !item.fixed && Math.hypot(x - item.x, y - item.y) < 48);
+        const closet = closets.find(item => Math.hypot(x - item.x, y - item.y) < 32);
+        const cabinet = storageCabinets.find(item => Math.hypot(x - item.x, y - item.y) < 34);
+        const door = getNearbyOfficeDoor(x, y, now);
+        const inComputerRange = Math.hypot(x - computer.x, y - computer.y) < 40;
+        if (door && (!inComputerRange || door.closedUntil <= now)) hint = mapLightsOn
+            ? door.closedUntil > now
+                ? `${door.name} đang đóng · mở sau ${Math.ceil((door.closedUntil - now) / 1000)} giây`
+                : `E · Đóng ${door.name} trong 10 giây`
+            : `${door.name} mất điện · không thể đóng`;
+        else if (generator) hint = hasHammer ? `E · Khởi động ${generator.name}` : 'Cần tìm búa trong tủ đồ để sửa máy phát.';
+        else if (closet) hint = 'E · Trốn trong tủ';
+        else if (cabinet) hint = cabinet.looted ? 'Tủ đồ đã trống' : 'E · Lục tủ đồ (phát ra tiếng động)';
+        else if (inComputerRange) hint = !mapLightsOn
+            ? 'Camera không hoạt động khi mất điện.'
+            : DIFFICULTIES[selectedDifficulty].camerasNeedPower
+                ? 'E · Xem camera (hao điện máy tính)'
+                : 'E · Xem camera';
+        else hint = `Máy phát ${generatorsFixed}/${requiredGeneratorCount} · Đèn pin ${Math.floor(localPlayer.battery)}%`;
+    }
+    if (generatorBlockedUntil > now && !minigameActive && !gameWon && !gameOver) {
+        hint = `Máy phát đang khóa · ${Math.ceil((generatorBlockedUntil - now) / 1000)} giây`;
+    }
+    if (!gameWon && !gameOver && now < lastNoticeUntil) hint = lastNotice;
+    if (!gameWon && !gameOver && !minigameActive && !mapLightsOn && !localPlayer?.cameraWatching) {
+        hint += ' · Mất điện · tìm máy phát';
+    } else if (!gameWon && !gameOver && mapLightsOn) {
+        const powerSeconds = Math.ceil(Math.max(0, lightPowerEndsAt - now) / 1000);
+        hint += ` · Đèn sáng ${Math.floor(powerSeconds / 60)}:${String(powerSeconds % 60).padStart(2, '0')}`;
+    }
+    interactionHint.innerText = `${timeLabel} · ${hint}`;
+    document.getElementById('game-info').hidden = true;
+    eventNotice.hidden = true;
+    document.getElementById('controls-hint').hidden = gameStarted;
+    const ended = gameWon || gameOver;
+    roundEndOverlay.hidden = !ended || now < jumpscareUntil;
+    if (ended) {
+        document.getElementById('round-end-title').innerText = gameWon ? 'BẠN ĐÃ SỐNG SÓT!' : 'BẠN ĐÃ BỊ BẮT';
+        document.getElementById('round-end-summary').innerText = gameWon
+            ? `Bạn đã sống sót đến ${formatGameClock(getRoundDuration())}.`
+            : 'Cả đội đã bị animatronic bắt. Hãy thử lại hoặc quay về màn hình chính.';
+        document.getElementById('restart-button').disabled = room?.role === 'guest';
+        document.getElementById('restart-button').innerText = room?.role === 'guest'
+            ? 'Chờ chủ phòng chơi lại'
+            : 'Chơi lại';
+    }
+}
+
+// --- RENDER GAME ---
+const lightingCanvas = document.createElement('canvas');
+lightingCanvas.width = VIEW_WIDTH;
+lightingCanvas.height = VIEW_HEIGHT;
+const lightingContext = lightingCanvas.getContext('2d');
+
+function getCameraPosition() {
+    const player = getLocalPlayer() || players[0];
+    const visibleWidth = VIEW_WIDTH / CAMERA_ZOOM;
+    const visibleHeight = VIEW_HEIGHT / CAMERA_ZOOM;
+    return {
+        x: Math.max(0, Math.min(MAP_WIDTH - visibleWidth, player.x + PLAYER_WIDTH / 2 - visibleWidth / 2)),
+        y: Math.max(0, Math.min(MAP_HEIGHT - visibleHeight, player.y + PLAYER_HEIGHT / 2 - visibleHeight / 2))
+    };
+}
+
+function drawCameraMonitor(player) {
+    if (!mapLightsOn) return;
+    const zone = CAMERA_ZONES[player.cameraIndex] || CAMERA_ZONES[0];
+    const x = 22;
+    const y = 20;
+    const width = 330;
+    const height = 220;
+    const worldWidth = 76;
+    const worldHeight = worldWidth * (height - 30) / width;
+    const viewX = Math.max(0, Math.min(MAP_WIDTH - worldWidth, zone.x - worldWidth / 2));
+    const viewY = Math.max(0, Math.min(MAP_HEIGHT - worldHeight, zone.y - worldHeight / 2));
+    const sourceScaleX = mapImage.naturalWidth / MAP_WIDTH;
+    const sourceScaleY = mapImage.naturalHeight / MAP_HEIGHT;
+    const sourceX = viewX * sourceScaleX;
+    const sourceY = viewY * sourceScaleY;
+    ctx.fillStyle = '#121c1e';
+    ctx.fillRect(x - 5, y - 5, width + 10, height + 10);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y + 24, width, height - 30);
+    ctx.clip();
+    ctx.drawImage(mapImage, sourceX, sourceY, worldWidth * sourceScaleX, worldHeight * sourceScaleY, x, y + 24, width, height - 30);
+    ctx.fillStyle = 'rgba(0, 18, 25, 0.28)';
+    ctx.fillRect(x, y + 24, width, height - 30);
+    const markerScaleX = width / worldWidth;
+    const markerScaleY = (height - 30) / worldHeight;
+    for (const bot of animatronics) {
+        if (bot.x < viewX || bot.x > viewX + worldWidth || bot.y < viewY || bot.y > viewY + worldHeight) continue;
+        const markerX = x + (bot.x + 7 - viewX) * markerScaleX;
+        const markerY = y + 24 + (bot.y + 11 - viewY) * markerScaleY;
+        const sprite = spriteImages[bot.type];
+        if (sprite?.complete && sprite.naturalWidth > 0) {
+            ctx.drawImage(sprite, markerX - 7 * markerScaleX, markerY - 11 * markerScaleY, 14 * markerScaleX, 22 * markerScaleY);
+        } else {
+            ctx.fillStyle = '#fa3535';
+            ctx.beginPath();
+            ctx.arc(markerX, markerY, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    for (const other of players) {
+        if (other.isDead || other.hiddenInCloset) continue;
+        const playerX = other.x + PLAYER_WIDTH / 2;
+        const playerY = other.y + PLAYER_HEIGHT / 2;
+        if (playerX < viewX || playerX > viewX + worldWidth || playerY < viewY || playerY > viewY + worldHeight) continue;
+        const markerX = x + (playerX - viewX) * markerScaleX;
+        const markerY = y + 24 + (playerY - viewY) * markerScaleY;
+        ctx.fillStyle = '#45f4d5';
+        ctx.fillRect(markerX - 3, markerY - 3, 6, 6);
+    }
+    ctx.fillStyle = 'rgba(125, 255, 245, 0.12)';
+    for (let lineY = y + 24; lineY < y + height; lineY += 4) ctx.fillRect(x, lineY, width, 1);
+    ctx.restore();
+    ctx.fillStyle = '#9fffea';
+    ctx.font = 'bold 13px Courier New';
+    ctx.textAlign = 'left';
+    ctx.fillText(`CAM ${player.cameraIndex + 1} · ${zone.name}`, x + 8, y + 17);
+    ctx.strokeStyle = '#93c7bd';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y + 24, width, height - 30);
+}
+
+function drawTimingMinigame() {
+    if (!minigameActive) return;
+    const width = 260;
+    const height = 20;
+    const x = (VIEW_WIDTH - width) / 2;
+    const y = VIEW_HEIGHT - 64;
+    const targetWidth = minigameType === 'heartbeat' ? DIFFICULTIES[selectedDifficulty].heartbeatWindow : 50;
+    const targetX = minigameType === 'heartbeat' ? 128 - targetWidth / 2 : 100;
+    const pointerX = minigameType === 'heartbeat' ? heartbeatPointer : minigamePointerPos;
+    ctx.fillStyle = 'rgba(5, 9, 12, 0.88)';
+    ctx.fillRect(x - 12, y - 24, width + 24, 58);
+    ctx.fillStyle = '#d9e2e2';
+    ctx.font = 'bold 12px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(minigameType === 'heartbeat' ? 'NHỊP TIM · E / SPACE' : 'KHỞI ĐỘNG MÁY PHÁT · E / SPACE', VIEW_WIDTH / 2, y - 8);
+    ctx.fillStyle = '#2a2d32';
+    ctx.fillRect(x, y, width, height);
+    ctx.fillStyle = minigameType === 'heartbeat' ? '#42d5a3' : '#2ecc71';
+    ctx.fillRect(x + targetX, y, targetWidth, height);
+    ctx.fillStyle = '#ff4242';
+    ctx.fillRect(x + pointerX, y - 3, 4, height + 6);
+    ctx.fillStyle = '#fff';
+    ctx.font = '11px Courier New';
+    ctx.fillText(`${minigameType === 'heartbeat' ? 'Nhịp' : 'Tiến độ'} ${minigameSuccessCount}/3`, VIEW_WIDTH / 2, y + 34);
+}
+
+function render() {
+    homeScreen.hidden = gameStarted || menuScreen !== 'home';
+    lobbyOverlay.hidden = gameStarted || menuScreen !== 'lobby';
+    mobileControls.hidden = !gameStarted;
+    document.getElementById('music-toggle').hidden = !gameStarted;
+    const localPlayer = getLocalPlayer();
+    signalNoise.classList.toggle('active', gameStarted && (!mapLightsOn || Boolean(localPlayer?.cameraWatching)));
+    if (!gameStarted) {
+        ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+        return;
+    }
+    const camera = getCameraPosition();
+    ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    ctx.save();
+    ctx.setTransform(CAMERA_ZOOM, 0, 0, CAMERA_ZOOM, -camera.x * CAMERA_ZOOM, -camera.y * CAMERA_ZOOM);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(camera.x, camera.y, VIEW_WIDTH / CAMERA_ZOOM, VIEW_HEIGHT / CAMERA_ZOOM);
+    ctx.drawImage(mapImage, 0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+    generators.forEach((generator, index) => {
+        if (index >= requiredGeneratorCount || generator.fixed) return;
+        drawGeneratorIcon(generator.x, generator.y, index + 1);
+    });
+
+    drawComputerIcon(computer.x, computer.y);
+    officeDoors.forEach(drawOfficeDoor);
+    closets.forEach(closet => drawClosetIcon(
+        closet.x,
+        closet.y,
+        players.some(player => player.hiddenInCloset && Math.hypot(player.x + PLAYER_WIDTH / 2 - closet.x, player.y + PLAYER_HEIGHT / 2 - closet.y) < 20)
+    ));
+    storageCabinets.forEach(cabinet => drawCabinetIcon(cabinet.x, cabinet.y, cabinet.looted));
+
+    animatronics.forEach(bot => drawSprite(bot.type, bot.x, bot.y, 14, 22));
+    players.forEach(player => {
+        if (!player.isDead && !player.hiddenInCloset) {
+            drawSprite(player.character, player.x + 1, player.y - 2, 12, 23);
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x + 3, player.y - 5, 8, 2);
+        }
+    });
+    ctx.restore();
+
+    lightingContext.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    lightingContext.fillStyle = mapLightsOn
+        ? 'rgba(0, 0, 0, 0.08)'
+        : 'rgba(0, 0, 0, 1)';
+    lightingContext.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    if (!mapLightsOn) {
+        lightingContext.globalCompositeOperation = 'destination-out';
+        players.forEach(player => {
+            if (player.isDead || player.hiddenInCloset) return;
+            const centerX = (player.x + PLAYER_WIDTH / 2 - camera.x) * CAMERA_ZOOM;
+            const centerY = (player.y + PLAYER_HEIGHT / 2 - camera.y) * CAMERA_ZOOM;
+            const ambientRadius = selectedDifficulty === 'easy' ? 118 : selectedDifficulty === 'normal' ? 102 : 86;
+            const ambientLight = lightingContext.createRadialGradient(centerX, centerY, 4, centerX, centerY, ambientRadius);
+            ambientLight.addColorStop(0, 'rgba(0, 0, 0, 1)');
+            ambientLight.addColorStop(0.48, 'rgba(0, 0, 0, 0.88)');
+            ambientLight.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            lightingContext.fillStyle = ambientLight;
+            lightingContext.beginPath();
+            lightingContext.arc(centerX, centerY, ambientRadius, 0, Math.PI * 2);
+            lightingContext.fill();
+            if (!player.flashlightOn) return;
+            const facingLength = Math.hypot(player.facingX, player.facingY) || 1;
+            const facingX = player.facingX / facingLength;
+            const facingY = player.facingY / facingLength;
+            const radius = selectedDifficulty === 'easy' ? 115 : selectedDifficulty === 'normal' ? 90 : 68;
+            const gradient = lightingContext.createRadialGradient(centerX, centerY, 10, centerX, centerY, radius);
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.96)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            lightingContext.fillStyle = gradient;
+            lightingContext.beginPath();
+            lightingContext.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            lightingContext.fill();
+            const beamLength = selectedDifficulty === 'easy' ? 470 : selectedDifficulty === 'normal' ? 390 : 310;
+            const originX = centerX + facingX * 12;
+            const originY = centerY + facingY * 12;
+            const tipX = originX + facingX * beamLength;
+            const tipY = originY + facingY * beamLength;
+            const spreadX = -facingY * beamLength * 0.48;
+            const spreadY = facingX * beamLength * 0.48;
+            const beam = lightingContext.createLinearGradient(originX, originY, tipX, tipY);
+            beam.addColorStop(0, 'rgba(0, 0, 0, 0.9)');
+            beam.addColorStop(0.72, 'rgba(0, 0, 0, 0.7)');
+            beam.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            lightingContext.fillStyle = beam;
+            lightingContext.beginPath();
+            lightingContext.moveTo(originX + spreadX * 0.14, originY + spreadY * 0.14);
+            lightingContext.lineTo(tipX + spreadX, tipY + spreadY);
+            lightingContext.lineTo(tipX - spreadX, tipY - spreadY);
+            lightingContext.lineTo(originX - spreadX * 0.14, originY - spreadY * 0.14);
+            lightingContext.closePath();
+            lightingContext.fill();
+        });
+        lightingContext.globalCompositeOperation = 'source-over';
+    }
+    ctx.drawImage(lightingCanvas, 0, 0);
+
+    if (localPlayer?.cameraWatching) drawCameraMonitor(localPlayer);
+    drawTimingMinigame();
+}
+
+const coopServerInput = document.getElementById('coop-server-url');
+const savedCoopServer = localStorage.getItem('fnaf-coop-server');
+if (savedCoopServer) coopServerInput.value = savedCoopServer;
+else if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+    coopServerInput.value = window.location.origin;
+}
+
+function getCoopServerUrl() {
+    const value = coopServerInput.value.trim();
+    const baseUrl = value || window.location.origin;
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(baseUrl);
+    } catch {
+        throw new Error('Địa chỉ server không hợp lệ. Hãy nhập URL đầy đủ, ví dụ https://ten-app.onrender.com.');
+    }
+    if (!['http:', 'https:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
+        throw new Error('Server phải dùng địa chỉ HTTP/HTTPS hợp lệ.');
+    }
+    return parsedUrl.origin;
+}
+
+function coopApiUrl(path) {
+    return new URL(path, `${getCoopServerUrl()}/`).toString();
+}
+
+function gameLoop() {
+    update();
+    render();
+    requestAnimationFrame(gameLoop);
+}
+
+function createStateSnapshot() {
+    return {
+        players: players.map(player => ({
+            id: player.id,
+            name: player.name,
+            character: player.character,
+            x: player.x,
+            y: player.y,
+            color: player.color,
+            isDead: player.isDead,
+            hiddenInCloset: player.hiddenInCloset,
+            hideElapsedMs: player.hideStartedAt ? Math.max(0, Date.now() - player.hideStartedAt) : 0,
+            hideNextInMs: Math.max(0, player.hideNextMinigameAt - Date.now()),
+            hideMinigameActive: player.hideMinigameActive,
+            closetCaughtRemainingMs: Math.max(0, player.closetCaughtUntil - Date.now()),
+            closetCaughtX: player.closetCaughtX || 0,
+            closetCaughtY: player.closetCaughtY || 0,
+            facingX: player.facingX,
+            facingY: player.facingY,
+            cameraWatching: player.cameraWatching,
+            cameraIndex: player.cameraIndex,
+            battery: player.battery,
+            flashlightOn: player.flashlightOn
+        })),
+        officeDoors: officeDoors.map(door => ({
+            closedRemainingMs: Math.max(0, door.closedUntil - Date.now())
+        })),
+        generators: generators.map(generator => generator.fixed),
+        storageCabinets: storageCabinets.map(cabinet => cabinet.looted),
+        generatorsFixed,
+        hasHammer,
+        selectedDifficulty,
+        requiredGeneratorCount,
+        baseGeneratorCount,
+        gameStarted,
+        roundElapsedMs: roundStartedAt ? Math.max(0, Date.now() - roundStartedAt) : 0,
+        computerPower,
+        mapLightsOn,
+        lightPowerRemainingMs: Math.max(0, lightPowerEndsAt - Date.now()),
+        activeCameraIndex,
+        lastNotice,
+        lastNoticeUntil,
+        gameWon,
+        gameOver,
+        minigameActive,
+        minigameRemainingMs: Math.max(0, minigameDeadlineAt - Date.now()),
+        minigameType,
+        minigamePlayerId,
+        currentGeneratorIndex,
+        minigamePointerPos,
+        heartbeatPointer,
+        heartbeatDirection,
+        heartbeatPlayerId,
+        minigameSpeed,
+        minigameSuccessCount,
+        generatorMisses,
+        generatorBlockedRemainingMs: Math.max(0, generatorBlockedUntil - Date.now()),
+        memorySequence,
+        memoryInput,
+        memoryVisibleMs: Math.max(0, memoryVisibleUntil - Date.now()),
+        puzzleTiles,
+        puzzleRemainingMs: Math.max(0, puzzleDeadlineAt - Date.now()),
+        generatorMemoryOrder,
+        soundTarget: soundTarget ? {
+            x: soundTarget.x,
+            y: soundTarget.y,
+            remainingMs: Math.max(0, soundTarget.expiresAt - Date.now())
+        } : null,
+        animatronics: animatronics.map(({ type, x, y, dir }) => ({ type, x, y, dir }))
+    };
+}
+
+function applyStateSnapshot(state) {
+    if (!state) return;
+    const shouldStartMusic = !gameStarted && state.gameStarted;
+    const previousLocal = getLocalPlayer();
+    const localWasAlive = previousLocal && !previousLocal.isDead;
+    const remoteLocalPlayer = state.players.find(player => player.id === localPlayerId);
+    if (localWasAlive && remoteLocalPlayer?.isDead) {
+        const nearestAnimatronic = state.animatronics.reduce((closest, bot) => {
+            const distance = Math.hypot(bot.x - remoteLocalPlayer.x, bot.y - remoteLocalPlayer.y);
+            return distance < closest.distance ? { type: bot.type, distance } : closest;
+        }, { type: 'freddy', distance: Infinity });
+        showJumpscare(nearestAnimatronic.type);
+    }
+    players.splice(0, players.length, ...state.players.map(player => ({
+        ...player,
+        hideStartedAt: player.hideElapsedMs ? Date.now() - player.hideElapsedMs : 0,
+        hideNextMinigameAt: Date.now() + (player.hideNextInMs || 0),
+        closetCaughtUntil: Date.now() + (player.closetCaughtRemainingMs || 0)
+    })));
+    if (!players.some(player => player.id === localPlayerId)) players.push(createPlayer(localPlayerId, 300, 620));
+    state.officeDoors?.forEach((door, index) => {
+        if (officeDoors[index]) officeDoors[index].closedUntil = Date.now() + (door.closedRemainingMs || 0);
+    });
+    state.generators.forEach((fixed, index) => { generators[index].fixed = fixed; });
+    state.storageCabinets?.forEach((looted, index) => { storageCabinets[index].looted = looted; });
+    generatorsFixed = state.generatorsFixed;
+    hasHammer = state.hasHammer;
+    computerPower = state.computerPower;
+    mapLightsOn = state.mapLightsOn;
+    lightPowerEndsAt = Date.now() + (state.lightPowerRemainingMs || 0);
+    activeCameraIndex = state.activeCameraIndex;
+    configureDifficulty(state.selectedDifficulty);
+    requiredGeneratorCount = state.requiredGeneratorCount;
+    baseGeneratorCount = state.baseGeneratorCount;
+    gameStarted = state.gameStarted;
+    if (shouldStartMusic) void startBackgroundMusic();
+    roundStartedAt = state.roundElapsedMs ? Date.now() - state.roundElapsedMs : 0;
+    lastNotice = state.lastNotice;
+    lastNoticeUntil = state.lastNoticeUntil;
+    gameWon = state.gameWon;
+    gameOver = state.gameOver;
+    minigameActive = state.minigameActive;
+    minigameDeadlineAt = Date.now() + (state.minigameRemainingMs || 0);
+    minigameType = state.minigameType;
+    minigamePlayerId = state.minigamePlayerId || 0;
+    currentGeneratorIndex = state.currentGeneratorIndex;
+    minigamePointerPos = state.minigamePointerPos;
+    heartbeatPointer = state.heartbeatPointer;
+    heartbeatDirection = state.heartbeatDirection;
+    heartbeatPlayerId = state.heartbeatPlayerId;
+    minigameSpeed = state.minigameSpeed;
+    minigameSuccessCount = state.minigameSuccessCount;
+    generatorMisses = state.generatorMisses || 0;
+    generatorBlockedUntil = Date.now() + (state.generatorBlockedRemainingMs || 0);
+    memorySequence = state.memorySequence || [];
+    memoryInput = state.memoryInput || [];
+    memoryVisibleUntil = Date.now() + (state.memoryVisibleMs || 0);
+    puzzleTiles = state.puzzleTiles || [];
+    puzzleDeadlineAt = Date.now() + (state.puzzleRemainingMs || 0);
+    generatorMemoryOrder = state.generatorMemoryOrder || 0;
+    soundTarget = state.soundTarget?.remainingMs > 0
+        ? { x: state.soundTarget.x, y: state.soundTarget.y, expiresAt: Date.now() + state.soundTarget.remainingMs }
+        : null;
+    state.animatronics.forEach((bot, index) => {
+        animatronics[index].x = bot.x;
+        animatronics[index].y = bot.y;
+        animatronics[index].dir = bot.dir;
+    });
+    minigameTitle.innerText = minigameType === 'heartbeat' ? 'NHỊP TIM · GIỮ BÌNH TĨNH'
+        : minigameType === 'memory' ? 'SỬA MẠCH · TRÍ NHỚ'
+            : minigameType === 'puzzle' ? 'SỬA MẠCH · XẾP HÌNH'
+                : 'KHỞI ĐỘNG MÁY PHÁT';
+    minigameInstruction.innerText = minigameType === 'heartbeat' ? 'Nhấn E / Space đúng nhịp 3 lần để tiếp tục ẩn nấp.'
+        : minigameType === 'memory' ? memoryVisibleUntil ? 'Ghi nhớ chuỗi màu.' : 'Chọn các màu theo đúng thứ tự đã ghi nhớ.'
+            : minigameType === 'puzzle' ? 'Xếp các ô từ 1 đến 8, ô trống ở góc dưới bên phải.'
+                : 'Nhấn E / Space khi vạch đỏ nằm trong vùng xanh.';
+    minigameProgress.innerText = minigameType === 'heartbeat'
+        ? `Nhịp tim: ${minigameSuccessCount}/3`
+        : `Tiến độ sửa máy: ${minigameSuccessCount}/3 · Trượt ${generatorMisses}/3`;
+    document.getElementById('minigame-pointer').style.left = `${minigameType === 'heartbeat' ? heartbeatPointer : minigamePointerPos}px`;
+    memorySequenceLabel.innerText = `Ghi nhớ: ${memorySequence.map(index => index + 1).join(' · ')}`;
+    memorySequenceLabel.hidden = minigameType !== 'memory' || !memoryVisibleUntil;
+    if (minigameType === 'puzzle') renderPuzzleBoard();
+    updateMinigameDisplay();
+    document.getElementById('game-info').hidden = true;
+    document.getElementById('controls-hint').hidden = gameStarted;
+    updateUI();
+}
+
+async function apiRequest(path, body) {
+    try {
+        const response = await fetch(coopApiUrl(path), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const contentType = response.headers.get('content-type') || '';
+        const responseBody = await response.text();
+        let result;
+        try {
+            result = JSON.parse(responseBody);
+        } catch {
+            if (!contentType.includes('application/json')) {
+                throw new Error(`Địa chỉ server trả về trang web thay vì JSON (HTTP ${response.status}). Hãy nhập URL backend Python, không phải link Netlify.`);
+            }
+            throw new Error('Server gửi JSON không hợp lệ.');
+        }
+        if (!result || typeof result !== 'object' || Array.isArray(result)) {
+            throw new Error('Server gửi dữ liệu không đúng định dạng.');
+        }
+        if (!response.ok) throw new Error(result.error || `Lỗi kết nối (${response.status}).`);
+        return result;
+    } catch (error) {
+        if (error instanceof TypeError) {
+            throw new Error(`Không kết nối được server co-op tại ${getCoopServerUrl()}. Kiểm tra server đang chạy, HTTPS và cấu hình CORS cho https://fnafangame.netlify.app.`);
+        }
+        throw error;
+    }
+}
+
+async function checkCoopServer() {
+    try {
+        const response = await fetch(coopApiUrl('/api/health'), { cache: 'no-store' });
+        const contentType = response.headers.get('content-type') || '';
+        const responseBody = await response.text();
+        let result;
+        try {
+            result = JSON.parse(responseBody);
+        } catch {
+            throw new Error(`Server trả trang web thay vì JSON (HTTP ${response.status}). URL này có thể là Netlify; hãy nhập URL backend Python.`);
+        }
+        if (!response.ok || !contentType.includes('application/json') || result?.ok !== true) {
+            throw new Error(result?.error || `Health check thất bại (HTTP ${response.status}).`);
+        }
+        updateRoomStatus(`Server co-op sẵn sàng: ${getCoopServerUrl()}`);
+    } catch (error) {
+        const message = error instanceof TypeError
+            ? `Không kết nối được ${getCoopServerUrl()}. Kiểm tra server, HTTPS và CORS cho https://fnafangame.netlify.app.`
+            : error.message;
+        updateRoomStatus(message, true);
+    }
+}
+
+function updateRoomStatus(message, isError = false) {
+    roomStatus.innerText = message;
+    roomStatus.style.color = isError ? '#ff7373' : '#bbb';
+    gameRoomStatus.innerText = message;
+    gameRoomStatus.style.color = isError ? '#ff7373' : '#bbb';
+}
+
+function updateRoomControls() {
+    const active = Boolean(room);
+    document.getElementById('create-room').hidden = active;
+    document.getElementById('join-form').hidden = active;
+    document.getElementById('leave-room').hidden = !active;
+    document.getElementById('start-game').hidden = selectedMode !== 'solo' || active;
+    document.getElementById('start-room').hidden = selectedMode !== 'coop' || room?.role === 'guest';
+}
+
+function setSelectedMode(mode) {
+    selectedMode = mode;
+    document.getElementById('solo-mode').classList.toggle('selected', mode === 'solo');
+    document.getElementById('coop-mode').classList.toggle('selected', mode === 'coop');
+    document.getElementById('room-panel').hidden = mode !== 'coop';
+    document.getElementById('start-game').hidden = mode !== 'solo' || Boolean(room);
+    document.getElementById('start-room').hidden = mode !== 'coop' || room?.role === 'guest';
+    setupStatus.innerText = '';
+}
+
+function readLocalProfile(id = localPlayerId) {
+    return {
+        name: playerNameInput.value.trim().slice(0, 18) || `player ${id}`,
+        character: selectedGuard
+    };
+}
+
+function applyProfile(player, profile) {
+    if (!player || !profile) return;
+    if (typeof profile.name === 'string' && profile.name.trim()) player.name = profile.name.trim().slice(0, 18);
+    if (guardChoices.includes(profile.character)) player.character = profile.character;
+}
+
+function updateGuestState(connectedIds, profiles, inputs) {
+    const previousCount = players.length;
+    const connected = new Set(connectedIds);
+    for (let playerId = 2; playerId <= 8; playerId++) {
+        let player = players.find(item => item.id === playerId);
+        if (connected.has(playerId)) {
+            if (!player) {
+                const spawn = PLAYER_SPAWNS[playerId - 1];
+                player = createPlayer(playerId, spawn[0], spawn[1]);
+                players.push(player);
+            }
+            applyProfile(player, profiles[String(playerId)]);
+            remoteInputs[playerId] = inputs[String(playerId)]?.keys || {};
+            remoteActions.push(...(inputs[String(playerId)]?.actions || []).map(action => ({ playerId, action })));
+        } else if (player) {
+            players.splice(players.indexOf(player), 1);
+            delete remoteInputs[playerId];
+        }
+    }
+    const totalPlayers = players.length;
+    if (gameStarted && totalPlayers !== previousCount) {
+        configureDifficulty(selectedDifficulty, totalPlayers);
+        showNotice(`Co-op: ${totalPlayers} người · cần khởi động ${requiredGeneratorCount} máy phát.`);
+    }
+    const startButton = document.getElementById('start-room');
+    startButton.disabled = totalPlayers < 2 || room?.role !== 'host';
+    startButton.innerText = totalPlayers > 1
+        ? `Bắt đầu co-op (${totalPlayers}/8)`
+        : 'Chờ người chơi rồi bắt đầu';
+    if (room?.role === 'host') {
+        const status = `Mã phòng: ${room.code} · ${totalPlayers}/8 người chơi`;
+        updateRoomStatus(status);
+    }
+}
+
+function configureDifficulty(difficulty, playerCount = players.length) {
+    selectedDifficulty = DIFFICULTIES[difficulty] ? difficulty : 'normal';
+    difficultySelect.value = selectedDifficulty;
+    baseGeneratorCount = DIFFICULTIES[selectedDifficulty].generators;
+    requiredGeneratorCount = Math.min(generators.length, baseGeneratorCount + Math.max(0, playerCount - 1));
+}
+
+function resetRound(startNow = true) {
+    if (room?.role === 'guest') return;
+    configureDifficulty(difficultySelect.value, room ? Math.max(1, players.length) : 1);
+    const profiles = players.map(player => ({
+        id: player.id,
+        profile: player.id === 1 ? readLocalProfile(1) : {
+            name: player.name,
+            character: player.character
+        }
+    }));
+    if (!room) {
+        localPlayerId = 1;
+        players.splice(0, players.length, createPlayer(1, 267, 620));
+        applyProfile(players[0], readLocalProfile(1));
+    } else {
+        for (const { id, profile } of profiles) {
+            const player = players.find(item => item.id === id);
+            if (player) {
+                const spawn = PLAYER_SPAWNS[id - 1] || PLAYER_SPAWNS[0];
+                Object.assign(player, createPlayer(id, spawn[0], spawn[1]));
+                applyProfile(player, profile);
+            }
+        }
+    }
+    generators.forEach(generator => { generator.fixed = false; });
+    storageCabinets.forEach(cabinet => { cabinet.looted = false; });
+    generatorsFixed = 0;
+    hasHammer = false;
+    computerPower = 100;
+    mapLightsOn = startNow;
+    lightPowerEndsAt = startNow ? Date.now() + DIFFICULTIES[selectedDifficulty].powerDurationMs : 0;
+    officeDoors.forEach(door => { door.closedUntil = 0; });
+    activeCameraIndex = 0;
+    gameWon = false;
+    gameOver = false;
+    gameStarted = startNow;
+    minigameActive = false;
+    minigameDeadlineAt = 0;
+    minigameType = 'generator';
+    minigamePlayerId = 0;
+    currentGeneratorIndex = -1;
+    minigamePointerPos = 0;
+    heartbeatPointer = 0;
+    heartbeatDirection = 1;
+    minigameSuccessCount = 0;
+    generatorMisses = 0;
+    generatorBlockedUntil = 0;
+    memorySequence = [];
+    memoryInput = [];
+    memoryVisibleUntil = 0;
+    puzzleTiles = [];
+    puzzleDeadlineAt = 0;
+    generatorMemoryOrder = 0;
+    renderedPuzzleState = null;
+    heartbeatPlayerId = 0;
+    soundTarget = null;
+    jumpscareUntil = 0;
+    roundStartedAt = startNow ? Date.now() : 0;
+    lastUpdateAt = Date.now();
+    lastNotice = '';
+    lastNoticeUntil = 0;
+    remoteActions = [];
+    Object.keys(remoteInputs).forEach(playerId => { delete remoteInputs[playerId]; });
+    players.forEach(player => {
+        player.isDead = false;
+        player.hiddenInCloset = false;
+        player.hideStartedAt = 0;
+        player.hideNextMinigameAt = 0;
+        player.hideMinigameActive = false;
+        player.closetCaughtUntil = 0;
+        player.closetCaughtX = 0;
+        player.closetCaughtY = 0;
+        player.facingX = 0;
+        player.facingY = 1;
+        player.cameraWatching = false;
+        player.cameraIndex = 0;
+        player.battery = 100;
+        player.flashlightOn = false;
+    });
+    const starts = [
+        [214, 125, 1], [254, 125, -1], [294, 125, 1], [334, 149, -1], [350, 149, 1]
+    ];
+    animatronics.forEach((bot, index) => {
+        [bot.x, bot.y, bot.dir] = starts[index];
+        bot.path = [];
+        bot.nextPathAt = 0;
+        bot.targetKey = '';
+        bot.patrolTarget = null;
+    });
+    homeScreen.hidden = startNow || menuScreen !== 'home';
+    lobbyOverlay.hidden = startNow || menuScreen !== 'lobby';
+    document.getElementById('game-info').hidden = true;
+    document.getElementById('controls-hint').hidden = startNow;
+    document.getElementById('minigame-overlay').style.display = 'none';
+    roundEndOverlay.hidden = true;
+    jumpscareOverlay.classList.remove('active');
+    exitScreen.hidden = true;
+    if (room?.role === 'host') {
+        configureDifficulty(selectedDifficulty, players.length);
+    }
+    if (startNow) void startBackgroundMusic();
+    updateUI();
+}
+
+async function returnToMainMenu() {
+    const previousRoom = room;
+    room = null;
+    if (previousRoom) {
+        try {
+            await apiRequest(`/api/rooms/${previousRoom.code}/leave`, {
+                role: previousRoom.role,
+                token: previousRoom.token,
+                playerId: previousRoom.playerId
+            });
+        } catch (error) {
+            updateRoomStatus(`Đã quay về menu; máy chủ báo: ${error.message}`, true);
+        }
+    }
+    localPlayerId = 1;
+    players.splice(1);
+    setSelectedMode('solo');
+    updateRoomControls();
+    menuScreen = 'home';
+    resetRound(false);
+}
+
+async function exitGame() {
+    const previousRoom = room;
+    room = null;
+    document.getElementById('exit-status').innerText = '';
+    if (previousRoom) {
+        try {
+            await apiRequest(`/api/rooms/${previousRoom.code}/leave`, {
+                role: previousRoom.role,
+                token: previousRoom.token,
+                playerId: previousRoom.playerId
+            });
+        } catch (error) {
+            document.getElementById('exit-status').innerText = `Không thể ngắt hoàn toàn kết nối phòng: ${error.message}`;
+        }
+    }
+    roundEndOverlay.hidden = true;
+    homeScreen.hidden = true;
+    lobbyOverlay.hidden = true;
+    exitScreen.hidden = false;
+    window.close();
+}
+
+document.getElementById('solo-mode').addEventListener('click', () => setSelectedMode('solo'));
+document.getElementById('coop-mode').addEventListener('click', () => setSelectedMode('coop'));
+document.getElementById('play-button').addEventListener('click', () => {
+    menuScreen = 'lobby';
+    homeScreen.hidden = true;
+    lobbyOverlay.hidden = false;
+    updateUI();
+});
+document.getElementById('music-toggle').addEventListener('click', () => {
+    if (backgroundMusic.paused) {
+        void startBackgroundMusic();
+    } else {
+        backgroundMusic.pause();
+        document.getElementById('music-toggle').innerText = 'Bật nhạc';
+        document.getElementById('music-toggle').setAttribute('aria-pressed', 'false');
+    }
+});
+document.getElementById('start-game').addEventListener('click', () => {
+    if (room) return;
+    resetRound(true);
+});
+document.getElementById('start-room').addEventListener('click', () => {
+    if (!room || room.role !== 'host' || document.getElementById('start-room').disabled) return;
+    resetRound(true);
+    setupStatus.innerText = 'Trận co-op đã bắt đầu.';
+});
+document.getElementById('restart-button').addEventListener('click', () => resetRound(true));
+document.getElementById('main-menu-button').addEventListener('click', returnToMainMenu);
+document.getElementById('end-exit-game').addEventListener('click', exitGame);
+document.getElementById('lobby-exit-game').addEventListener('click', exitGame);
+document.getElementById('exit-close-tab').addEventListener('click', () => window.close());
+generatorExitButton.addEventListener('click', () => {
+    const player = getLocalPlayer();
+    if (player) sendPlayerAction(player, 'generator-abort');
+});
+memoryPad.querySelectorAll('[data-memory-index]').forEach(button => {
+    button.style.backgroundColor = MEMORY_COLORS[Number(button.dataset.memoryIndex)];
+    button.addEventListener('click', () => {
+        const player = getLocalPlayer();
+        if (player) sendPlayerAction(player, `memory-${button.dataset.memoryIndex}`);
+    });
+});
+document.getElementById('exit-return-menu').addEventListener('click', async () => {
+    exitScreen.hidden = true;
+    await returnToMainMenu();
+});
+document.querySelectorAll('#mobile-dpad [data-key]').forEach(button => {
+    const key = button.dataset.key;
+    button.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        keys[key] = true;
+        button.setPointerCapture(event.pointerId);
+    });
+    const release = event => {
+        event.preventDefault();
+        keys[key] = false;
+    };
+    button.addEventListener('pointerup', release);
+    button.addEventListener('pointercancel', release);
+    button.addEventListener('lostpointercapture', () => { keys[key] = false; });
+});
+document.querySelectorAll('#mobile-actions [data-action]').forEach(button => {
+    button.addEventListener('click', () => {
+        const player = getLocalPlayer();
+        if (player) sendPlayerAction(player, button.dataset.action);
+    });
+});
+document.querySelectorAll('[data-mobile-camera]').forEach(button => {
+    button.addEventListener('click', () => {
+        const player = getLocalPlayer();
+        if (!player?.cameraWatching) return;
+        const nextIndex = (player.cameraIndex + Number(button.dataset.mobileCamera) + CAMERA_ZONES.length) % CAMERA_ZONES.length;
+        sendPlayerAction(player, `camera-${nextIndex + 1}`);
+    });
+});
+document.getElementById('volume-control').addEventListener('input', event => {
+    masterGain.gain.setTargetAtTime(Number(event.currentTarget.value) / 100, AudioCtx.currentTime, 0.03);
+});
+document.getElementById('music-volume').addEventListener('input', event => {
+    backgroundMusic.volume = Number(event.currentTarget.value) / 100;
+});
+backgroundMusic.volume = Number(document.getElementById('music-volume').value) / 100;
+backgroundMusic.addEventListener('error', () => {
+    document.getElementById('music-status').innerText = 'Không tải được tệp nhạc trong thư mục game.';
+});
+
+guardChoices.forEach((character, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.innerHTML = `<img src="assets/sprites/${character}.png" alt=""><span>Night Guard ${index + 1}</span>`;
+    button.classList.toggle('selected', character === selectedGuard);
+    button.addEventListener('click', () => {
+        selectedGuard = character;
+        document.querySelectorAll('#character-choices button').forEach(choice => {
+            choice.classList.toggle('selected', choice === button);
+        });
+    });
+    document.getElementById('character-choices').appendChild(button);
+});
+
+playerNameInput.addEventListener('input', () => {
+    const player = getLocalPlayer();
+    if (!gameStarted && player) player.name = readLocalProfile().name;
+});
+playerNameInput.addEventListener('change', () => {
+    if (room?.role === 'guest') syncRoom();
+});
+difficultySelect.addEventListener('change', () => {
+    if (!gameStarted) configureDifficulty(difficultySelect.value);
+});
+
+document.getElementById('create-room').addEventListener('click', async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    updateRoomStatus('Đang tạo phòng...');
+    try {
+        const result = await apiRequest('/api/rooms', {});
+        if (!/^[0-9]{6}$/.test(result.code) || typeof result.token !== 'string') {
+            throw new Error('Máy chủ trả về mã phòng không hợp lệ.');
+        }
+        room = { role: 'host', code: result.code, token: result.token, playerId: 1 };
+        updateRoomControls();
+        document.getElementById('room-code-display').innerText = result.code;
+        updateRoomStatus(`Mã phòng: ${room.code} · Chia sẻ mã cho người chơi thứ hai`);
+        startRoomSync();
+    } catch (error) {
+        updateRoomStatus(`${error.message} Hãy kiểm tra địa chỉ backend co-op phía trên.`, true);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+document.getElementById('join-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const codeInput = document.getElementById('join-code');
+    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+    const code = codeInput.value.trim();
+    if (!/^[0-9]{6}$/.test(code)) {
+        updateRoomStatus('Mã phòng gồm đúng 6 chữ số.', true);
+        return;
+    }
+    submitButton.disabled = true;
+    if (!playerNameInput.value.trim() || /^player [1-8]$/i.test(playerNameInput.value.trim())) {
+        playerNameInput.value = 'player 2';
+    }
+    updateRoomStatus('Đang kết nối phòng...');
+    try {
+        const result = await apiRequest(`/api/rooms/${code}/join`, { profile: readLocalProfile(2) });
+        if (result.code !== code || typeof result.token !== 'string'
+            || !Number.isInteger(result.playerId) || result.playerId < 2 || result.playerId > 8) {
+            throw new Error('Máy chủ trả về thông tin phòng không hợp lệ.');
+        }
+        room = { role: 'guest', code: result.code, token: result.token, playerId: result.playerId };
+        localPlayerId = result.playerId;
+        const spawn = PLAYER_SPAWNS[localPlayerId - 1] || PLAYER_SPAWNS[0];
+        players.splice(0, players.length, createPlayer(localPlayerId, spawn[0], spawn[1]));
+        if (/^player [1-8]$/i.test(playerNameInput.value.trim())) playerNameInput.value = `player ${localPlayerId}`;
+        applyProfile(players[0], readLocalProfile(localPlayerId));
+        updateRoomControls();
+        document.getElementById('room-code-display').innerText = room.code;
+        updateRoomStatus(`Đã vào phòng ${room.code} · Đang chờ host bắt đầu`);
+        startRoomSync();
+    } catch (error) {
+        updateRoomStatus(error.message, true);
+    } finally {
+        submitButton.disabled = false;
+    }
+});
+document.getElementById('join-code').addEventListener('input', event => {
+    event.currentTarget.value = event.currentTarget.value.replace(/[^0-9]/g, '').slice(0, 6);
+});
+document.getElementById('coop-server-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+        const serverUrl = getCoopServerUrl();
+        coopServerInput.value = serverUrl;
+        localStorage.setItem('fnaf-coop-server', serverUrl);
+        await checkCoopServer();
+    } catch (error) {
+        updateRoomStatus(error.message, true);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+document.getElementById('leave-room').addEventListener('click', async () => {
+    if (!room) return;
+    const previousRoom = room;
+    room = null;
+    try {
+        await apiRequest(`/api/rooms/${previousRoom.code}/leave`, {
+            role: previousRoom.role,
+            token: previousRoom.token,
+            playerId: previousRoom.playerId
+        });
+    } catch (error) {
+        updateRoomStatus(`Đã rời giao diện phòng; máy chủ báo: ${error.message}`, true);
+    }
+    if (previousRoom.role === 'guest') {
+        localPlayerId = 1;
+        players.splice(0, players.length, createPlayer(1, 267, 620));
+        menuScreen = 'lobby';
+        resetRound(false);
+        setSelectedMode('solo');
+    } else {
+        players.splice(1);
+    }
+    updateRoomControls();
+    updateRoomStatus('Đang chơi một mình.');
+});
+
+function startRoomSync() {
+    if (room && !syncInProgress) syncRoom();
+}
+
+async function syncRoom() {
+    if (!room || syncInProgress) return;
+    syncInProgress = true;
+    const currentRoom = room;
+    const actions = currentRoom.role === 'guest' ? queuedActions.splice(0) : [];
+    try {
+        const payload = {
+            role: currentRoom.role,
+            token: currentRoom.token,
+            playerId: currentRoom.playerId
+        };
+        if (currentRoom.role === 'host') payload.state = createStateSnapshot();
+        else payload.input = {
+            keys: { w: Boolean(keys.w), a: Boolean(keys.a), s: Boolean(keys.s), d: Boolean(keys.d) },
+            actions,
+            profile: readLocalProfile(currentRoom.playerId)
+        };
+        const result = await apiRequest(`/api/rooms/${currentRoom.code}/sync`, payload);
+        if (room !== currentRoom) return;
+        lastSyncAt = Date.now();
+        if (currentRoom.role === 'host') {
+            updateGuestState(result.connectedPlayerIds || [], result.guestProfiles || {}, result.inputs || {});
+        } else {
+            if (result.state) applyStateSnapshot(result.state);
+            updateRoomStatus(result.state?.gameStarted ? `Đã vào phòng ${currentRoom.code} · Co-op đang chơi` : `Đã vào phòng ${currentRoom.code} · Đang chờ host bắt đầu`);
+        }
+    } catch (error) {
+        if (currentRoom.role === 'guest') queuedActions.unshift(...actions);
+        if (room === currentRoom) updateRoomStatus(`Mất kết nối máy chủ: ${error.message} · Đang thử kết nối lại`, true);
+    } finally {
+        syncInProgress = false;
+        if (room) setTimeout(syncRoom, lastSyncAt && Date.now() - lastSyncAt > 3000 ? 1000 : 100);
+    }
+}
+
+window.addEventListener('beforeunload', () => {
+    if (room) {
+        fetch(coopApiUrl(`/api/rooms/${room.code}/leave`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: room.role, token: room.token, playerId: room.playerId }),
+            keepalive: true
+        });
+    }
+});
+
+const gameImages = [mapImage, ...Object.values(spriteImages)];
+Promise.all(gameImages.map(image => new Promise((resolve, reject) => {
+    if (image.complete) {
+        if (image.naturalWidth > 0) resolve();
+        else reject(new Error(`Không tải được ảnh: ${image.src}`));
+        return;
+    }
+    image.addEventListener('load', resolve, { once: true });
+    image.addEventListener('error', () => reject(new Error(`Không tải được ảnh: ${image.src}`)), { once: true });
+}))).then(() => {
+    const collisionCanvas = document.createElement('canvas');
+    collisionCanvas.width = MAP_WIDTH;
+    collisionCanvas.height = MAP_HEIGHT;
+    const collisionContext = collisionCanvas.getContext('2d', { willReadFrequently: true });
+    collisionContext.drawImage(mapImage, 0, 0, MAP_WIDTH, MAP_HEIGHT);
+    mapPixels = collisionContext.getImageData(0, 0, MAP_WIDTH, MAP_HEIGHT).data;
+    buildNavigationGrid();
+    updateUI();
+    void checkCoopServer();
+    gameLoop();
+}).catch(error => {
+    console.error(error);
+    ctx.fillStyle = '#fff';
+    ctx.font = '14px Courier New';
+    ctx.fillText(error.message, 12, 28);
+});
+</script>
+</body>
+</html>
