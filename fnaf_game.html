@@ -40,6 +40,7 @@
             image-rendering: pixelated;
             touch-action: none;
         }
+        #mobile-joystick[hidden] { display: none; }
         #signal-noise {
             position: absolute;
             inset: 0;
@@ -59,6 +60,10 @@
             opacity: 0.34;
             animation: signal-interference 0.14s steps(2, end) infinite;
         }
+        #signal-noise.camera-glitch.active {
+            opacity: 0.5;
+            animation-duration: 0.08s;
+        }
         #signal-noise::after {
             position: absolute;
             inset: 0;
@@ -67,6 +72,12 @@
                 linear-gradient(0deg, transparent 0 26%, rgba(255, 255, 255, 0.2) 27%, transparent 30% 72%, rgba(0, 220, 255, 0.18) 73%, transparent 76%),
                 repeating-linear-gradient(0deg, transparent 0 11px, rgba(255, 255, 255, 0.12) 12px 13px);
             animation: signal-roll 1.8s steps(1, end) infinite;
+        }
+        #signal-noise.camera-glitch::after {
+            background:
+                linear-gradient(0deg, transparent 0 11%, rgba(255, 255, 255, 0.28) 12%, transparent 14% 33%, rgba(0, 220, 255, 0.22) 34%, transparent 37% 68%, rgba(255, 35, 35, 0.24) 69%, transparent 72%),
+                repeating-linear-gradient(0deg, transparent 0 5px, rgba(220, 245, 255, 0.17) 6px 7px);
+            animation: camera-signal-roll 0.9s steps(1, end) infinite;
         }
         #gameCanvas {
             width: 100%;
@@ -524,6 +535,65 @@
         #mobile-controls { display: none; }
         #mobile-controls[hidden] { display: none; }
         #mobile-camera-controls[hidden] { display: none; }
+        #player-vitals {
+            position: absolute;
+            top: 54px;
+            right: 10px;
+            z-index: 6;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 9px;
+            border: 1px solid rgba(190, 198, 202, 0.45);
+            border-radius: 4px;
+            background: rgba(10, 12, 16, 0.84);
+            color: #f2eeee;
+            font-size: 13px;
+            pointer-events: none;
+        }
+        #player-vitals[hidden] { display: none; }
+        #health-hearts { color: #ff454f; letter-spacing: 2px; }
+        #stamina-track {
+            width: 92px;
+            height: 9px;
+            overflow: hidden;
+            border: 1px solid #6f777a;
+            background: #1a1d20;
+        }
+        #stamina-fill {
+            width: 100%;
+            height: 100%;
+            background: #e8c34a;
+            transition: width 100ms linear, background-color 150ms linear;
+        }
+        #mobile-joystick {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            display: none;
+            width: 148px;
+            height: 148px;
+            opacity: 0;
+            pointer-events: auto;
+            touch-action: none;
+        }
+        #mobile-joystick.active { opacity: 0.48; }
+        #joystick-base, #joystick-knob {
+            position: absolute;
+            border: 2px solid rgba(230, 235, 235, 0.8);
+            border-radius: 50%;
+            background: rgba(24, 29, 32, 0.68);
+            pointer-events: none;
+        }
+        #joystick-base { inset: 18px; }
+        #joystick-knob {
+            top: 50%;
+            left: 50%;
+            width: 48px;
+            height: 48px;
+            transform: translate(-50%, -50%);
+            background: rgba(195, 205, 205, 0.6);
+        }
         @keyframes screen-noise {
             0%, 100% { transform: translate(0, 0); opacity: 0.46; }
             25% { transform: translate(1.4%, -0.8%); opacity: 0.8; }
@@ -539,6 +609,15 @@
             81% { transform: translateY(-8%); opacity: 0.85; }
             83% { transform: translateY(5%); opacity: 0.5; }
             85% { transform: translateY(0); opacity: 0.2; }
+        }
+        @keyframes camera-signal-roll {
+            0%, 52%, 100% { transform: translateY(0); opacity: 0.24; }
+            53% { transform: translateY(-12%); opacity: 0.95; }
+            55% { transform: translateY(8%); opacity: 0.72; }
+            58% { transform: translateY(0); opacity: 0.3; }
+            77% { transform: translateY(0); opacity: 0.3; }
+            78% { transform: translateY(5%); opacity: 0.85; }
+            80% { transform: translateY(0); opacity: 0.28; }
         }
         @keyframes screen-glitch {
             0%, 7%, 9%, 23%, 25%, 44%, 47%, 68%, 71%, 91%, 94%, 100% { transform: translate(0); opacity: 0.2; }
@@ -618,17 +697,7 @@
                 user-select: none;
                 -webkit-tap-highlight-color: transparent;
             }
-            #mobile-dpad {
-                display: grid;
-                grid-template-columns: repeat(3, clamp(44px, 13vw, 60px));
-                grid-template-rows: repeat(2, clamp(44px, 13vw, 60px));
-                gap: 4px;
-                pointer-events: none;
-            }
-            #mobile-dpad [data-key="w"] { grid-column: 2; grid-row: 1; }
-            #mobile-dpad [data-key="a"] { grid-column: 1; grid-row: 2; }
-            #mobile-dpad [data-key="s"] { grid-column: 2; grid-row: 2; }
-            #mobile-dpad [data-key="d"] { grid-column: 3; grid-row: 2; }
+            #mobile-joystick { display: block; }
             #mobile-actions {
                 display: flex;
                 flex-direction: column;
@@ -636,9 +705,27 @@
                 gap: 7px;
                 pointer-events: none;
             }
+            #mobile-actions [data-action="interact"] {
+                position: absolute;
+                left: 10px;
+                bottom: 160px;
+            }
             #mobile-actions button { min-width: 62px; width: auto; padding: 0 10px; }
             #mobile-actions [data-action="interact"] { width: 70px; height: 70px; border-radius: 50%; background: rgba(104, 30, 25, 0.82); }
+            #mobile-actions [data-action="run"] { min-height: 52px; border-radius: 50%; background: rgba(137, 95, 26, 0.85); }
             #mobile-camera-controls { display: flex; gap: 6px; }
+            #mobile-camera-controls:not([hidden]) {
+                position: absolute;
+                left: 50%;
+                bottom: 10px;
+                transform: translateX(-50%);
+                padding: 4px;
+                border: 1px solid rgba(226, 220, 203, 0.35);
+                border-radius: 24px;
+                background: rgba(10, 12, 16, 0.72);
+            }
+            #player-vitals { top: 52px; right: 6px; gap: 5px; padding: 5px 7px; font-size: 11px; }
+            #stamina-track { width: 64px; }
         }
         @media (max-width: 420px) {
             #home-screen { padding: 12px; }
@@ -725,19 +812,24 @@
         </div>
 
         <div id="mobile-controls" hidden aria-label="Điều khiển cảm ứng">
-            <div id="mobile-dpad" aria-label="Di chuyển">
-                <button type="button" data-key="w" aria-label="Đi lên">▲</button>
-                <button type="button" data-key="a" aria-label="Đi sang trái">◀</button>
-                <button type="button" data-key="s" aria-label="Đi xuống">▼</button>
-                <button type="button" data-key="d" aria-label="Đi sang phải">▶</button>
-            </div>
             <div id="mobile-actions">
                 <div id="mobile-camera-controls" hidden>
                     <button type="button" data-mobile-camera="-1" aria-label="Camera trước">‹</button>
                     <button type="button" data-mobile-camera="1" aria-label="Camera tiếp">›</button>
                 </div>
                 <button type="button" data-action="light" aria-label="Bật hoặc tắt đèn pin">F</button>
-                <button type="button" data-action="interact" aria-label="Tương tác">E</button>
+                <button type="button" data-action="run" aria-pressed="false" aria-label="Bật hoặc tắt chạy">CHẠY</button>
+                <button type="button" data-action="interact" aria-label="Tương tác" hidden>E</button>
+            </div>
+        </div>
+        <div id="mobile-joystick" aria-label="Joystick di chuyển" role="presentation">
+            <div id="joystick-base"><div id="joystick-knob"></div></div>
+        </div>
+        <div id="player-vitals" hidden aria-label="Mạng và thể lực">
+            <span id="health-hearts" aria-label="Mạng">♥♥♥</span>
+            <span>THỂ LỰC</span>
+            <div id="stamina-track" role="progressbar" aria-label="Thể lực" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+                <div id="stamina-fill"></div>
             </div>
         </div>
         <button id="chat-toggle" type="button" hidden aria-expanded="false" aria-controls="chat-panel">Chat</button>
@@ -806,7 +898,7 @@
     </div>
     <div id="event-notice" aria-live="polite"></div>
     <div id="controls-hint">
-        WASD di chuyển · E tương tác · F đèn pin · 1–5 camera
+        WASD di chuyển · Shift bật/tắt chạy · E tương tác · F đèn pin · 1–5 camera
     </div>
 
 <script>
@@ -822,6 +914,13 @@ const lobbyOverlay = document.getElementById('lobby-overlay');
 const homeScreen = document.getElementById('home-screen');
 const mobileControls = document.getElementById('mobile-controls');
 const mobileCameraControls = document.getElementById('mobile-camera-controls');
+const mobileJoystick = document.getElementById('mobile-joystick');
+const joystickKnob = document.getElementById('joystick-knob');
+const playerVitals = document.getElementById('player-vitals');
+const healthHearts = document.getElementById('health-hearts');
+const staminaFill = document.getElementById('stamina-fill');
+const interactButton = document.querySelector('#mobile-actions [data-action="interact"]');
+const runButton = document.querySelector('#mobile-actions [data-action="run"]');
 const chatToggle = document.getElementById('chat-toggle');
 const chatPanel = document.getElementById('chat-panel');
 const chatLog = document.getElementById('chat-log');
@@ -1021,15 +1120,48 @@ const generators = [
 ];
 const computer = { x: 267, y: 596 };
 const officeDoors = [
-    { name: 'Cổng trái', x: 245, y: 610, width: 72, height: 18, closedUntil: 0 },
-    { name: 'Cổng phải', x: 315, y: 610, width: 72, height: 18, closedUntil: 0 }
+    { name: 'Cổng trái', x: 220, y: 610, width: 18, height: 64, closedUntil: 0 },
+    { name: 'Cổng phải', x: 355, y: 610, width: 18, height: 64, closedUntil: 0 }
 ];
 
 function getNearbyOfficeDoor(x, y, now = Date.now()) {
     const nearby = officeDoors
-        .filter(door => Math.hypot(x - door.x, y - door.y) < 52)
+        .filter(door => Math.hypot(x - door.x, y - door.y) < 38)
         .sort((first, second) => Math.hypot(x - first.x, y - first.y) - Math.hypot(x - second.x, y - second.y));
     return nearby.find(door => door.closedUntil <= now) || nearby[0] || null;
+}
+
+function ejectPlayersFromDoor(door) {
+    for (const player of players) {
+        if (player.isDead || player.hiddenInCloset) continue;
+        const overlaps = player.x < door.x + door.width / 2
+            && player.x + PLAYER_WIDTH > door.x - door.width / 2
+            && player.y < door.y + door.height / 2
+            && player.y + PLAYER_HEIGHT > door.y - door.height / 2;
+        if (!overlaps) continue;
+        const leftX = door.x - door.width / 2 - PLAYER_WIDTH - 1;
+        const rightX = door.x + door.width / 2 + 1;
+        const preferred = player.x + PLAYER_WIDTH / 2 < door.x ? [leftX, rightX] : [rightX, leftX];
+        let ejected = false;
+        for (const candidateX of preferred) {
+            for (const offsetY of [0, -4, 4, -8, 8, -12, 12, -16, 16]) {
+                const candidateY = player.y + offsetY;
+                if (!canOccupy(candidateX, candidateY, PLAYER_WIDTH, PLAYER_HEIGHT)) continue;
+                player.x = candidateX;
+                player.y = candidateY;
+                player.networkTargetX = candidateX;
+                player.networkTargetY = candidateY;
+                ejected = true;
+                break;
+            }
+            if (ejected) break;
+        }
+        if (!ejected) {
+            const fallbackX = preferred[0];
+            player.x = Math.max(2, Math.min(MAP_WIDTH - PLAYER_WIDTH - 2, fallbackX));
+            player.networkTargetX = player.x;
+        }
+    }
 }
 const closets = [
     { x: 35, y: 180 }, { x: 125, y: 180 }, { x: 335, y: 180 },
@@ -1060,6 +1192,13 @@ const DIFFICULTIES = {
     hard: { startMinute: 21 * 60, durationMinutes: 10 * 60 + 30, generators: 8, powerDurationMs: 30000, patrolSpeed: 19, chaseSpeed: 56, pathInterval: 420, flashlightDrain: 24, hideMinSeconds: 15, hideMaxSeconds: 17, heartbeatWindow: 34, generatorLockoutMs: 5000, memoryLength: 5, puzzleMoves: 9, puzzleTimeSeconds: 24, computerDrain: 25, camerasNeedPower: true }
 };
 const MINIGAME_TIMEOUT_MS = 30000;
+const PLAYER_MAX_LIVES = 3;
+const PLAYER_MAX_STAMINA = 100;
+const PLAYER_SPRINT_DRAIN = 34;
+const PLAYER_STAMINA_REGEN = 23;
+const PLAYER_SPRINT_RECOVERY = 30;
+const PLAYER_HIT_INVULNERABILITY_MS = 3000;
+const ANIMATRONIC_SIGHT_RANGE = 145;
 
 function getRoundDuration() {
     return DIFFICULTIES[selectedDifficulty].durationMinutes * 1000;
@@ -1142,6 +1281,12 @@ function createPlayer(id, x, y) {
         x, y,
         color: `hsl(${(id * 47 + 195) % 360} 72% 62%)`,
         isDead: false,
+        lives: 3,
+        stamina: 100,
+        sprinting: false,
+        sprintExhausted: false,
+        invisibleUntil: 0,
+        invulnerableUntil: 0,
         hiddenInCloset: false,
         hideStartedAt: 0,
         hideNextMinigameAt: 0,
@@ -1353,26 +1498,26 @@ function drawOfficeDoor(door) {
     ctx.strokeRect(-halfWidth + 0.5, -halfHeight + 0.5, door.width - 1, door.height - 1);
     if (closed) {
         ctx.fillStyle = '#7b2924';
-        ctx.fillRect(-halfWidth + 3, -halfHeight + 2, door.width - 6, door.height - 4);
+        ctx.fillRect(-halfWidth + 2, -halfHeight + 3, door.width - 4, door.height - 6);
         ctx.fillStyle = '#f1c40f';
-        for (let bar = -halfWidth + 7; bar < halfWidth - 3; bar += 8) {
-            ctx.fillRect(bar, -halfHeight + 3, 2, door.height - 6);
+        for (let bar = -halfHeight + 8; bar < halfHeight - 3; bar += 8) {
+            ctx.fillRect(-halfWidth + 3, bar, door.width - 6, 2);
         }
         ctx.fillStyle = '#f25b4b';
-        ctx.fillRect(-halfWidth + 3, -halfHeight + 1, door.width - 6, 2);
-        ctx.fillRect(-halfWidth + 3, halfHeight - 3, door.width - 6, 2);
+        ctx.fillRect(-halfWidth + 1, -halfHeight + 3, 2, door.height - 6);
+        ctx.fillRect(halfWidth - 3, -halfHeight + 3, 2, door.height - 6);
     } else {
         ctx.fillStyle = '#152024';
-        ctx.fillRect(-halfWidth + 4, -halfHeight + 3, door.width - 8, door.height - 6);
+        ctx.fillRect(-halfWidth + 3, -halfHeight + 4, door.width - 6, door.height - 8);
         ctx.fillStyle = '#55c878';
-        ctx.fillRect(-halfWidth + 1, -halfHeight + 2, 3, door.height - 4);
-        ctx.fillRect(halfWidth - 4, -halfHeight + 2, 3, door.height - 4);
+        ctx.fillRect(-halfWidth + 2, -halfHeight + 2, door.width - 4, 3);
+        ctx.fillRect(-halfWidth + 2, halfHeight - 5, door.width - 4, 3);
         ctx.strokeStyle = 'rgba(140, 190, 205, 0.45)';
         ctx.lineWidth = 1;
-        for (let bar = -halfWidth + 9; bar < halfWidth - 5; bar += 10) {
+        for (let bar = -halfHeight + 8; bar < halfHeight - 5; bar += 10) {
             ctx.beginPath();
-            ctx.moveTo(bar, -halfHeight + 3);
-            ctx.lineTo(bar, halfHeight - 3);
+            ctx.moveTo(-halfWidth + 3, bar);
+            ctx.lineTo(halfWidth - 3, bar);
             ctx.stroke();
         }
     }
@@ -1384,6 +1529,9 @@ const keys = {};
 const queuedActions = [];
 let syncInProgress = false;
 let lastSyncAt = 0;
+let sprintActive = false;
+const keyboardKeys = new Set();
+const joystickKeys = new Set();
 
 function getKeyboardKey(event) {
     const digitCode = /^(?:Digit|Numpad)([0-9])$/.exec(event.code);
@@ -1393,6 +1541,21 @@ function getKeyboardKey(event) {
 function isEditableTarget(target) {
     return target instanceof HTMLElement
         && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+}
+
+function setKeyInput(key, source, active) {
+    const sourceKeys = source === 'joystick' ? joystickKeys : keyboardKeys;
+    if (active) sourceKeys.add(key);
+    else sourceKeys.delete(key);
+    keys[key] = keyboardKeys.has(key) || joystickKeys.has(key);
+}
+
+function setSprintActive(active) {
+    const player = getLocalPlayer();
+    sprintActive = Boolean(active) && Boolean(player && !player.isDead
+        && !player.sprintExhausted && player.stamina > 0);
+    runButton.setAttribute('aria-pressed', String(sprintActive));
+    runButton.textContent = sprintActive ? 'DỪNG' : 'CHẠY';
 }
 
 function getLocalPlayer() {
@@ -1497,13 +1660,17 @@ function applyAction(player, action) {
 window.addEventListener('keydown', e => {
     if (isEditableTarget(e.target)) return;
     const key = getKeyboardKey(e);
-    if (['w', 'a', 's', 'd', 'e', 'f', ' ', 'escape', 'r', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)
+    if (['w', 'a', 's', 'd', 'e', 'f', ' ', 'escape', 'r', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)
         || (/^[1-5]$/.test(key) && (isLocalMinigameActive() || getLocalPlayer()?.cameraWatching))) e.preventDefault();
-    if (keys[key]) return;
-    keys[key] = true;
+    if (keyboardKeys.has(key)) return;
+    setKeyInput(key, 'keyboard', true);
     if (!gameStarted) return;
 
     const localPlayer = getLocalPlayer();
+    if (key === 'shift') {
+        setSprintActive(!sprintActive);
+        return;
+    }
     if (key === 'r' && (gameOver || gameWon) && room?.role !== 'guest') {
         resetRound(true);
         return;
@@ -1546,21 +1713,30 @@ window.addEventListener('keydown', e => {
     }
 });
 window.addEventListener('keyup', e => {
-    keys[getKeyboardKey(e)] = false;
+    setKeyInput(getKeyboardKey(e), 'keyboard', false);
 });
 window.addEventListener('blur', () => {
-    Object.keys(keys).forEach(key => { keys[key] = false; });
+    keyboardKeys.forEach(key => { keys[key] = joystickKeys.has(key); });
+    keyboardKeys.clear();
 });
 
 function playerMovement(player, input, deltaSeconds) {
-    if (player.isDead || player.hiddenInCloset || player.cameraWatching || player.closetCaughtUntil > Date.now()
-        || (minigameActive && minigamePlayerId === player.id)) return;
+    if (player.isDead || player.hiddenInCloset || player.cameraWatching
+        || player.closetCaughtUntil > Date.now()
+        || (minigameActive && minigamePlayerId === player.id)) {
+        player.sprinting = false;
+        return;
+    }
+    const wantsSprint = player.id === localPlayerId ? sprintActive : Boolean(input.sprint);
+    const moving = Boolean(input.a || input.d || input.w || input.s);
+    player.sprinting = wantsSprint && moving && !player.sprintExhausted && player.stamina > 0;
+    const speed = player.sprinting ? 180 : 108;
     let dx = 0;
     let dy = 0;
-    if (input.a) dx -= 108 * deltaSeconds;
-    if (input.d) dx += 108 * deltaSeconds;
-    if (input.w) dy -= 108 * deltaSeconds;
-    if (input.s) dy += 108 * deltaSeconds;
+    if (input.a) dx -= speed * deltaSeconds;
+    if (input.d) dx += speed * deltaSeconds;
+    if (input.w) dy -= speed * deltaSeconds;
+    if (input.s) dy += speed * deltaSeconds;
     if (dx || dy) {
         const magnitude = Math.hypot(dx, dy);
         player.facingX = dx / magnitude;
@@ -1583,15 +1759,28 @@ function updatePlayerResources(deltaSeconds) {
     const difficulty = DIFFICULTIES[selectedDifficulty];
     for (const player of players) {
         if (player.isDead) continue;
+        if (player.sprinting) {
+            player.stamina = Math.max(0, player.stamina - PLAYER_SPRINT_DRAIN * deltaSeconds);
+            if (player.stamina === 0) {
+                player.sprinting = false;
+                player.sprintExhausted = true;
+                if (player.id === localPlayerId) sprintActive = false;
+            }
+        } else {
+            player.stamina = Math.min(PLAYER_MAX_STAMINA, player.stamina + PLAYER_STAMINA_REGEN * deltaSeconds);
+            if (player.sprintExhausted && player.stamina >= PLAYER_SPRINT_RECOVERY) {
+                player.sprintExhausted = false;
+            }
+        }
         if (player.flashlightOn) {
             player.battery = Math.max(0, player.battery - difficulty.flashlightDrain / 60 * deltaSeconds);
             if (player.battery === 0) player.flashlightOn = false;
         }
         if (player.cameraWatching) {
             if (difficulty.camerasNeedPower) computerPower = Math.max(0, computerPower - 3 * deltaSeconds);
-            if (!mapLightsOn || (difficulty.camerasNeedPower && computerPower === 0)) {
+            if (difficulty.camerasNeedPower && computerPower === 0) {
                 player.cameraWatching = false;
-                showNotice(!mapLightsOn ? 'Màn hình camera mất điện.' : 'Màn hình camera hết điện.');
+                showNotice('Màn hình camera hết điện.');
             }
         }
         if (player.hiddenInCloset && !minigameActive && Date.now() >= player.hideNextMinigameAt) {
@@ -1607,6 +1796,48 @@ function updatePlayerResources(deltaSeconds) {
     if (minigameActive && minigameType === 'puzzle' && puzzleDeadlineAt && Date.now() >= puzzleDeadlineAt) {
         registerGeneratorMiss('Hết giờ xếp hình.');
     }
+}
+
+function updateLocalStamina(player, deltaSeconds) {
+    if (player.sprinting) {
+        player.stamina = Math.max(0, player.stamina - PLAYER_SPRINT_DRAIN * deltaSeconds);
+        if (player.stamina === 0) {
+            player.sprinting = false;
+            player.sprintExhausted = true;
+            sprintActive = false;
+        }
+    } else {
+        player.stamina = Math.min(PLAYER_MAX_STAMINA, player.stamina + PLAYER_STAMINA_REGEN * deltaSeconds);
+        if (player.sprintExhausted && player.stamina >= PLAYER_SPRINT_RECOVERY) {
+            player.sprintExhausted = false;
+        }
+    }
+}
+
+function damagePlayer(player, animatronic) {
+    if (!player || player.isDead || player.invulnerableUntil > Date.now()) return false;
+    player.lives = Math.max(0, (Number.isInteger(player.lives) ? player.lives : PLAYER_MAX_LIVES) - 1);
+    player.hiddenInCloset = false;
+    player.hideMinigameActive = false;
+    player.hideStartedAt = 0;
+    player.hideNextMinigameAt = 0;
+    player.closetCaughtUntil = 0;
+    player.cameraWatching = false;
+    player.flashlightOn = false;
+    player.sprinting = false;
+    if (player.id === localPlayerId) sprintActive = false;
+    if (player.lives === 0) {
+        player.isDead = true;
+        player.invisibleUntil = 0;
+        player.invulnerableUntil = 0;
+        if (player.id === localPlayerId) showJumpscare(animatronic?.type);
+        checkGameOver();
+        return true;
+    }
+    player.invisibleUntil = Date.now() + PLAYER_HIT_INVULNERABILITY_MS;
+    player.invulnerableUntil = player.invisibleUntil;
+    showNotice(`${player.name} mất 1 mạng · tạm biến mất trong 3 giây (${player.lives} ♥).`);
+    return true;
 }
 
 function toggleFlashlight(p) {
@@ -1626,7 +1857,10 @@ function update() {
     if (!localPlayer) return;
 
     if (room?.role === 'guest') {
-        if (!gameOver && !gameWon) playerMovement(localPlayer, keys, deltaSeconds);
+        if (!gameOver && !gameWon) {
+            playerMovement(localPlayer, keys, deltaSeconds);
+            updateLocalStamina(localPlayer, deltaSeconds);
+        }
         smoothNetworkPositions(deltaSeconds);
         updateUI();
         return;
@@ -1654,10 +1888,8 @@ function update() {
     } else if (mapLightsOn && now >= lightPowerEndsAt) {
         mapLightsOn = false;
         lightPowerEndsAt = 0;
-        players.forEach(player => { player.cameraWatching = false; });
-        officeDoors.forEach(door => { door.closedUntil = 0; });
         animatronics.forEach(bot => { bot.nextPathAt = 0; bot.path = []; });
-        showNotice('Đèn trong nhà đã tắt! Tìm và sửa máy phát để khôi phục điện.');
+        showNotice('Đèn trong nhà đã tắt! Camera an ninh và cửa văn phòng vẫn hoạt động.');
     }
 
     if (minigameActive) {
@@ -1693,7 +1925,9 @@ function updateAnimatronics(now, deltaSeconds) {
     if (soundTarget && now >= soundTarget.expiresAt) soundTarget = null;
     const audibleNoise = soundTarget && now < soundTarget.expiresAt ? soundTarget : null;
     animatronics.forEach(bot => {
-        const targets = players.filter(player => !player.isDead && !player.hiddenInCloset);
+        const targets = players.filter(player => !player.isDead && !player.hiddenInCloset
+            && player.invisibleUntil <= now
+            && Math.hypot(player.x - bot.x, player.y - bot.y) <= ANIMATRONIC_SIGHT_RANGE);
         const target = audibleNoise || (hunting && targets.length > 0 ? targets.reduce((nearest, player) => {
                 const distance = Math.hypot(player.x - bot.x, player.y - bot.y);
                 return distance < nearest.distance ? { player, distance } : nearest;
@@ -1759,17 +1993,15 @@ function updateAnimatronics(now, deltaSeconds) {
 }
 
 function checkPlayerCollisions() {
+    const now = Date.now();
     animatronics.forEach(bot => {
         players.forEach(player => {
-            if (!player.isDead && !player.hiddenInCloset && Math.hypot(
+            if (!player.isDead && !player.hiddenInCloset && player.invisibleUntil <= now
+                && player.invulnerableUntil <= now && Math.hypot(
                 player.x + PLAYER_WIDTH / 2 - (bot.x + 7),
                 player.y + PLAYER_HEIGHT / 2 - (bot.y + 11)
             ) < 17) {
-                player.isDead = true;
-                player.cameraWatching = false;
-                player.hiddenInCloset = false;
-                if (player.id === localPlayerId) showJumpscare(bot.type);
-                checkGameOver();
+                damagePlayer(player, bot);
             }
         });
     });
@@ -1784,11 +2016,7 @@ function updateClosetAmbushes(now) {
         }, { bot: animatronics[0], distance: Infinity });
         nearest.bot.x = player.closetCaughtX;
         nearest.bot.y = player.closetCaughtY;
-        player.closetCaughtUntil = 0;
-        player.isDead = true;
-        player.hiddenInCloset = false;
-        if (player.id === localPlayerId) showJumpscare(nearest.bot.type);
-        checkGameOver();
+        damagePlayer(player, nearest.bot);
     }
 }
 
@@ -1826,24 +2054,19 @@ function interact(p) {
         return;
     }
     const door = getNearbyOfficeDoor(playerX, playerY);
-    const inComputerRange = Math.hypot(playerX - computer.x, playerY - computer.y) < 40;
-    if (door && (!inComputerRange || door.closedUntil <= Date.now())) {
-        if (!mapLightsOn) {
-            showNotice('Không thể đóng cửa khi mất điện.');
-        } else if (door.closedUntil > Date.now()) {
+    if (door) {
+        if (door.closedUntil > Date.now()) {
             showNotice(`${door.name} đang đóng · ${Math.ceil((door.closedUntil - Date.now()) / 1000)} giây nữa sẽ mở.`);
         } else {
             door.closedUntil = Date.now() + 10000;
+            ejectPlayersFromDoor(door);
             showNotice(`${door.name} đã đóng trong 10 giây.`);
         }
         return;
     }
+    const inComputerRange = Math.hypot(playerX - computer.x, playerY - computer.y) < 40;
     if (inComputerRange) {
         const difficulty = DIFFICULTIES[selectedDifficulty];
-        if (!mapLightsOn) {
-            showNotice('Màn hình camera mất điện. Không thể xem khi đèn trong nhà đã tắt.');
-            return;
-        }
         if (difficulty.camerasNeedPower && computerPower < difficulty.computerDrain) {
             showNotice('Máy tính hết điện.');
             return;
@@ -1886,6 +2109,20 @@ function interact(p) {
         } else if (!hasHammer) showNotice('Cần nhặt búa sửa chữa trước khi sửa máy phát.');
         else startMinigame(generatorIndex, p);
     }
+}
+
+function canInteractNow(player) {
+    if (!player || player.isDead || gameOver || gameWon || player.closetCaughtUntil > Date.now()) return false;
+    if (minigameActive) return player.id === minigamePlayerId;
+    if (player.cameraWatching) return true;
+    const x = player.x + PLAYER_WIDTH / 2;
+    const y = player.y + PLAYER_HEIGHT / 2;
+    return closets.some(item => Math.hypot(x - item.x, y - item.y) < 20)
+        || Boolean(getNearbyOfficeDoor(x, y))
+        || Math.hypot(x - computer.x, y - computer.y) < 40
+        || storageCabinets.some(item => Math.hypot(x - item.x, y - item.y) < 21)
+        || generators.some((item, index) => index < requiredGeneratorCount && !item.fixed
+            && Math.hypot(x - item.x, y - item.y) < 20);
 }
 
 function getNextHideMinigameAt() {
@@ -2190,6 +2427,24 @@ function updateUI() {
     const localPlayer = getLocalPlayer();
     mobileControls.hidden = !gameStarted;
     mobileCameraControls.hidden = !gameStarted || !localPlayer?.cameraWatching;
+    mobileJoystick.hidden = !gameStarted || !localPlayer || localPlayer.isDead || localPlayer.cameraWatching
+        || localPlayer.hiddenInCloset || localPlayer.closetCaughtUntil > Date.now() || isLocalMinigameActive();
+    if (mobileJoystick.hidden && joystickPointerId !== null) releaseJoystick();
+    playerVitals.hidden = !gameStarted || !localPlayer || localPlayer.isDead;
+    interactButton.hidden = !gameStarted || !canInteractNow(localPlayer);
+    runButton.hidden = !gameStarted || !localPlayer || localPlayer.isDead || localPlayer.cameraWatching
+        || localPlayer.hiddenInCloset || localPlayer.closetCaughtUntil > Date.now() || isLocalMinigameActive();
+    runButton.setAttribute('aria-pressed', String(sprintActive));
+    runButton.textContent = sprintActive ? 'DỪNG' : 'CHẠY';
+    if (localPlayer) {
+        const stamina = Math.max(0, Math.min(PLAYER_MAX_STAMINA, localPlayer.stamina));
+        const lives = Math.max(0, Math.min(PLAYER_MAX_LIVES, localPlayer.lives));
+        healthHearts.textContent = `${'♥'.repeat(lives)}${'♡'.repeat(PLAYER_MAX_LIVES - lives)}`;
+        healthHearts.setAttribute('aria-label', `${lives} trên ${PLAYER_MAX_LIVES} mạng`);
+        staminaFill.style.width = `${stamina}%`;
+        staminaFill.style.backgroundColor = stamina <= 25 ? '#ed6658' : '#e8c34a';
+        staminaFill.parentElement.setAttribute('aria-valuenow', String(Math.round(stamina)));
+    }
     if (!gameStarted) {
         interactionHint.innerText = '';
         document.getElementById('game-info').hidden = true;
@@ -2219,19 +2474,15 @@ function updateUI() {
         const cabinet = storageCabinets.find(item => Math.hypot(x - item.x, y - item.y) < 34);
         const door = getNearbyOfficeDoor(x, y, now);
         const inComputerRange = Math.hypot(x - computer.x, y - computer.y) < 40;
-        if (door && (!inComputerRange || door.closedUntil <= now)) hint = mapLightsOn
-            ? door.closedUntil > now
+        if (door) hint = door.closedUntil > now
                 ? `${door.name} đang đóng · mở sau ${Math.ceil((door.closedUntil - now) / 1000)} giây`
-                : `E · Đóng ${door.name} trong 10 giây`
-            : `${door.name} mất điện · không thể đóng`;
+                : `E · Đóng ${door.name} trong 10 giây`;
         else if (generator) hint = hasHammer ? `E · Khởi động ${generator.name}` : 'Cần tìm búa trong tủ đồ để sửa máy phát.';
         else if (closet) hint = 'E · Trốn trong tủ';
         else if (cabinet) hint = cabinet.looted ? 'Tủ đồ đã trống' : 'E · Lục tủ đồ (phát ra tiếng động)';
-        else if (inComputerRange) hint = !mapLightsOn
-            ? 'Camera không hoạt động khi mất điện.'
-            : DIFFICULTIES[selectedDifficulty].camerasNeedPower
-                ? 'E · Xem camera (hao điện máy tính)'
-                : 'E · Xem camera';
+        else if (inComputerRange) hint = DIFFICULTIES[selectedDifficulty].camerasNeedPower
+            ? mapLightsOn ? 'E · Xem camera (hao điện máy tính)' : 'Camera không hoạt động khi mất điện.'
+            : `E · Xem camera${mapLightsOn ? '' : ' (vẫn hoạt động khi mất điện)'}`;
         else hint = `Máy phát ${generatorsFixed}/${requiredGeneratorCount} · Đèn pin ${Math.floor(localPlayer.battery)}%`;
     }
     if (generatorBlockedUntil > now && !minigameActive && !gameWon && !gameOver) {
@@ -2267,6 +2518,16 @@ const lightingCanvas = document.createElement('canvas');
 lightingCanvas.width = VIEW_WIDTH;
 lightingCanvas.height = VIEW_HEIGHT;
 const lightingContext = lightingCanvas.getContext('2d');
+const pointerLight = { x: 0, y: 0, visible: false };
+
+canvas.addEventListener('pointermove', event => {
+    if (event.pointerType !== 'mouse') return;
+    const bounds = canvas.getBoundingClientRect();
+    pointerLight.x = (event.clientX - bounds.left) * canvas.width / bounds.width;
+    pointerLight.y = (event.clientY - bounds.top) * canvas.height / bounds.height;
+    pointerLight.visible = true;
+});
+canvas.addEventListener('pointerleave', () => { pointerLight.visible = false; });
 
 function getCameraPosition() {
     const player = getSpectateTarget() || getLocalPlayer() || players[0];
@@ -2279,13 +2540,12 @@ function getCameraPosition() {
 }
 
 function drawCameraMonitor(player) {
-    if (!mapLightsOn) return;
     const zone = CAMERA_ZONES[player.cameraIndex] || CAMERA_ZONES[0];
-    const x = 22;
-    const y = 20;
-    const width = 330;
-    const height = 220;
-    const worldWidth = 76;
+    const x = 18;
+    const y = 18;
+    const width = VIEW_WIDTH - 36;
+    const height = VIEW_HEIGHT - 36;
+    const worldWidth = 160;
     const worldHeight = worldWidth * (height - 30) / width;
     const viewX = Math.max(0, Math.min(MAP_WIDTH - worldWidth, zone.x - worldWidth / 2));
     const viewY = Math.max(0, Math.min(MAP_HEIGHT - worldHeight, zone.y - worldHeight / 2));
@@ -2294,7 +2554,7 @@ function drawCameraMonitor(player) {
     const sourceX = viewX * sourceScaleX;
     const sourceY = viewY * sourceScaleY;
     ctx.fillStyle = '#121c1e';
-    ctx.fillRect(x - 5, y - 5, width + 10, height + 10);
+    ctx.fillRect(x - 7, y - 7, width + 14, height + 14);
     ctx.save();
     ctx.beginPath();
     ctx.rect(x, y + 24, width, height - 30);
@@ -2305,18 +2565,26 @@ function drawCameraMonitor(player) {
     const markerScaleX = width / worldWidth;
     const markerScaleY = (height - 30) / worldHeight;
     for (const bot of animatronics) {
-        if (bot.x < viewX || bot.x > viewX + worldWidth || bot.y < viewY || bot.y > viewY + worldHeight) continue;
+        if (bot.x + 14 < viewX || bot.x > viewX + worldWidth
+            || bot.y + 22 < viewY || bot.y > viewY + worldHeight) continue;
         const markerX = x + (bot.x + 7 - viewX) * markerScaleX;
         const markerY = y + 24 + (bot.y + 11 - viewY) * markerScaleY;
         const sprite = spriteImages[bot.type];
         if (sprite?.complete && sprite.naturalWidth > 0) {
             ctx.drawImage(sprite, markerX - 7 * markerScaleX, markerY - 11 * markerScaleY, 14 * markerScaleX, 22 * markerScaleY);
         } else {
-            ctx.fillStyle = '#fa3535';
+            ctx.fillStyle = '#ff334f';
             ctx.beginPath();
-            ctx.arc(markerX, markerY, 5, 0, Math.PI * 2);
+            ctx.arc(markerX, markerY, 9, 0, Math.PI * 2);
             ctx.fill();
         }
+        ctx.fillStyle = '#ff5264';
+        ctx.font = 'bold 13px Courier New';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#160406';
+        ctx.shadowBlur = 4;
+        ctx.fillText(bot.type.toUpperCase(), markerX, markerY - 16);
+        ctx.shadowBlur = 0;
     }
     for (const other of players) {
         if (other.isDead || other.hiddenInCloset) continue;
@@ -2329,7 +2597,8 @@ function drawCameraMonitor(player) {
         ctx.fillRect(markerX - 3, markerY - 3, 6, 6);
     }
     ctx.fillStyle = 'rgba(125, 255, 245, 0.12)';
-    for (let lineY = y + 24; lineY < y + height; lineY += 4) ctx.fillRect(x, lineY, width, 1);
+    for (let lineY = y + 24; lineY < y + height; lineY += 5) ctx.fillRect(x, lineY, width, 1);
+    drawCameraGlitch(x, y + 24, width, height - 30);
     ctx.restore();
     ctx.fillStyle = '#9fffea';
     ctx.font = 'bold 13px Courier New';
@@ -2338,6 +2607,31 @@ function drawCameraMonitor(player) {
     ctx.strokeStyle = '#93c7bd';
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y + 24, width, height - 30);
+}
+
+function drawCameraGlitch(x, y, width, height) {
+    const phase = Math.floor(Date.now() / 85);
+    if (phase % 6 === 0 || phase % 11 === 0) {
+        const hash = value => {
+            const sample = Math.sin((phase + 1) * 127.1 + value * 311.7) * 43758.5453;
+            return sample - Math.floor(sample);
+        };
+        const strips = phase % 11 === 0 ? 5 : 2;
+        for (let index = 0; index < strips; index++) {
+            const stripY = y + hash(index) * height;
+            const stripHeight = 2 + hash(index + 8) * 8;
+            const offset = (hash(index + 18) - 0.5) * 46;
+            ctx.fillStyle = index % 2
+                ? 'rgba(255, 40, 55, 0.46)'
+                : 'rgba(60, 235, 255, 0.42)';
+            ctx.fillRect(x + offset, stripY, width - Math.abs(offset), stripHeight);
+            ctx.fillStyle = 'rgba(245, 250, 255, 0.28)';
+            ctx.fillRect(x, stripY + stripHeight, width, 1);
+        }
+    }
+    const pulse = 0.08 + Math.abs(Math.sin(Date.now() / 135)) * 0.1;
+    ctx.fillStyle = `rgba(180, 255, 250, ${pulse})`;
+    ctx.fillRect(x, y + ((phase * 7) % height), width, 2);
 }
 
 function drawTimingMinigame() {
@@ -2381,6 +2675,7 @@ function render() {
         ? `Đang xem: ${spectateTarget.name} · ←/→`
         : '';
     signalNoise.classList.toggle('active', gameStarted && (!mapLightsOn || Boolean(localPlayer?.cameraWatching)));
+    signalNoise.classList.toggle('camera-glitch', gameStarted && Boolean(localPlayer?.cameraWatching));
     if (!gameStarted) {
         ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
         return;
@@ -2409,7 +2704,7 @@ function render() {
 
     animatronics.forEach(bot => drawSprite(bot.type, bot.x, bot.y, 14, 22));
     players.forEach(player => {
-        if (!player.isDead && !player.hiddenInCloset) {
+        if (!player.isDead && !player.hiddenInCloset && player.invisibleUntil <= Date.now()) {
             drawSprite(player.character, player.x + 1, player.y - 2, 12, 23);
             ctx.fillStyle = player.color;
             ctx.fillRect(player.x + 3, player.y - 5, 8, 2);
@@ -2425,7 +2720,7 @@ function render() {
     if (!mapLightsOn) {
         lightingContext.globalCompositeOperation = 'destination-out';
         players.forEach(player => {
-            if (player.isDead) return;
+            if (player.isDead || player.invisibleUntil > Date.now()) return;
             if (player.hiddenInCloset) {
                 const playerX = player.x + PLAYER_WIDTH / 2;
                 const playerY = player.y + PLAYER_HEIGHT / 2;
@@ -2487,10 +2782,35 @@ function render() {
             lightingContext.closePath();
             lightingContext.fill();
         });
+        if (pointerLight.visible) {
+            const lightRadius = 170;
+            const cursorLight = lightingContext.createRadialGradient(
+                pointerLight.x, pointerLight.y, 3,
+                pointerLight.x, pointerLight.y, lightRadius
+            );
+            cursorLight.addColorStop(0, 'rgba(0, 0, 0, 0.98)');
+            cursorLight.addColorStop(0.42, 'rgba(0, 0, 0, 0.86)');
+            cursorLight.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            lightingContext.fillStyle = cursorLight;
+            lightingContext.beginPath();
+            lightingContext.arc(pointerLight.x, pointerLight.y, lightRadius, 0, Math.PI * 2);
+            lightingContext.fill();
+        }
         lightingContext.globalCompositeOperation = 'source-over';
     }
     ctx.drawImage(lightingCanvas, 0, 0);
 
+    if (pointerLight.visible) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 238, 183, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = 'rgba(255, 211, 112, 0.9)';
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.arc(pointerLight.x, pointerLight.y, 19, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
     if (localPlayer?.cameraWatching) drawCameraMonitor(localPlayer);
     drawTimingMinigame();
 }
@@ -2537,6 +2857,12 @@ function createStateSnapshot() {
             y: player.y,
             color: player.color,
             isDead: player.isDead,
+            lives: player.lives,
+            stamina: player.stamina,
+            sprinting: player.sprinting,
+            sprintExhausted: player.sprintExhausted,
+            invisibleRemainingMs: Math.max(0, player.invisibleUntil - Date.now()),
+            invulnerableRemainingMs: Math.max(0, player.invulnerableUntil - Date.now()),
             hiddenInCloset: player.hiddenInCloset,
             hideElapsedMs: player.hideStartedAt ? Math.max(0, Date.now() - player.hideStartedAt) : 0,
             hideNextInMs: Math.max(0, player.hideNextMinigameAt - Date.now()),
@@ -2618,6 +2944,12 @@ function applyStateSnapshot(state) {
         const canInterpolate = room?.role === 'guest' && previous && !player.isDead && !previous.isDead;
         return {
             ...player,
+            lives: Number.isInteger(player.lives) ? player.lives : PLAYER_MAX_LIVES,
+            stamina: Number.isFinite(player.stamina) ? player.stamina : PLAYER_MAX_STAMINA,
+            sprinting: Boolean(player.sprinting),
+            sprintExhausted: Boolean(player.sprintExhausted),
+            invisibleUntil: Date.now() + (player.invisibleRemainingMs || 0),
+            invulnerableUntil: Date.now() + (player.invulnerableRemainingMs || 0),
             x: canInterpolate ? previous.x : player.x,
             y: canInterpolate ? previous.y : player.y,
             networkTargetX: player.x,
@@ -2834,7 +3166,10 @@ function updateGuestState(connectedIds, profiles, inputs) {
                 players.push(player);
             }
             applyProfile(player, profiles[String(playerId)]);
-            remoteInputs[playerId] = inputs[String(playerId)]?.keys || {};
+            remoteInputs[playerId] = {
+                ...(inputs[String(playerId)]?.keys || {}),
+                sprint: inputs[String(playerId)]?.sprint === true
+            };
             remoteActions.push(...(inputs[String(playerId)]?.actions || []).map(action => ({ playerId, action })));
         } else if (player) {
             players.splice(players.indexOf(player), 1);
@@ -2867,6 +3202,7 @@ function configureDifficulty(difficulty, playerCount = players.length) {
 function resetRound(startNow = true) {
     if (room?.role === 'guest') return;
     spectateTargetId = 0;
+    sprintActive = false;
     configureDifficulty(difficultySelect.value, room ? Math.max(1, players.length) : 1);
     const profiles = players.map(player => ({
         id: player.id,
@@ -2930,6 +3266,12 @@ function resetRound(startNow = true) {
     Object.keys(remoteInputs).forEach(playerId => { delete remoteInputs[playerId]; });
     players.forEach(player => {
         player.isDead = false;
+        player.lives = PLAYER_MAX_LIVES;
+        player.stamina = PLAYER_MAX_STAMINA;
+        player.sprinting = false;
+        player.sprintExhausted = false;
+        player.invisibleUntil = 0;
+        player.invulnerableUntil = 0;
         player.hiddenInCloset = false;
         player.hideStartedAt = 0;
         player.hideNextMinigameAt = 0;
@@ -3077,25 +3419,64 @@ document.getElementById('exit-return-menu').addEventListener('click', async () =
     exitScreen.hidden = true;
     await returnToMainMenu();
 });
-document.querySelectorAll('#mobile-dpad [data-key]').forEach(button => {
-    const key = button.dataset.key;
-    button.addEventListener('pointerdown', event => {
-        event.preventDefault();
-        keys[key] = true;
-        button.setPointerCapture(event.pointerId);
-    });
-    const release = event => {
-        event.preventDefault();
-        keys[key] = false;
-    };
-    button.addEventListener('pointerup', release);
-    button.addEventListener('pointercancel', release);
-    button.addEventListener('lostpointercapture', () => { keys[key] = false; });
+let joystickPointerId = null;
+function releaseJoystick() {
+    joystickPointerId = null;
+    joystickKeys.clear();
+    ['w', 'a', 's', 'd'].forEach(key => { keys[key] = keyboardKeys.has(key); });
+    mobileJoystick.classList.remove('active');
+    joystickKnob.style.left = '50%';
+    joystickKnob.style.top = '50%';
+    joystickKnob.style.transform = 'translate(-50%, -50%)';
+}
+function updateJoystick(event) {
+    const rect = mobileJoystick.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const maxDistance = Math.min(centerX, centerY) - 30;
+    let dx = event.clientX - rect.left - centerX;
+    let dy = event.clientY - rect.top - centerY;
+    const distance = Math.hypot(dx, dy);
+    if (distance > maxDistance) {
+        dx = dx / distance * maxDistance;
+        dy = dy / distance * maxDistance;
+    }
+    joystickKnob.style.left = `${centerX + dx}px`;
+    joystickKnob.style.top = `${centerY + dy}px`;
+    joystickKnob.style.transform = 'translate(-50%, -50%)';
+    joystickKeys.clear();
+    if (Math.abs(dx) > maxDistance * 0.28) joystickKeys.add(dx < 0 ? 'a' : 'd');
+    if (Math.abs(dy) > maxDistance * 0.28) joystickKeys.add(dy < 0 ? 'w' : 's');
+    ['w', 'a', 's', 'd'].forEach(key => { keys[key] = keyboardKeys.has(key) || joystickKeys.has(key); });
+    mobileJoystick.classList.add('active');
+}
+mobileJoystick.addEventListener('pointerdown', event => {
+    if (mobileJoystick.hidden || !gameStarted || joystickPointerId !== null) return;
+    event.preventDefault();
+    joystickPointerId = event.pointerId;
+    mobileJoystick.setPointerCapture(event.pointerId);
+    updateJoystick(event);
 });
+mobileJoystick.addEventListener('pointermove', event => {
+    if (event.pointerId !== joystickPointerId) return;
+    event.preventDefault();
+    updateJoystick(event);
+});
+mobileJoystick.addEventListener('pointerup', event => {
+    if (event.pointerId === joystickPointerId) releaseJoystick();
+});
+mobileJoystick.addEventListener('pointercancel', event => {
+    if (event.pointerId === joystickPointerId) releaseJoystick();
+});
+mobileJoystick.addEventListener('lostpointercapture', releaseJoystick);
 document.querySelectorAll('#mobile-actions [data-action]').forEach(button => {
     button.addEventListener('click', () => {
         const player = getLocalPlayer();
-        if (player) sendPlayerAction(player, button.dataset.action);
+        if (button.dataset.action === 'run') {
+            setSprintActive(!sprintActive);
+        } else if (player) {
+            sendPlayerAction(player, button.dataset.action);
+        }
     });
 });
 document.querySelectorAll('[data-mobile-camera]').forEach(button => {
@@ -3271,6 +3652,7 @@ async function syncRoom() {
         if (currentRoom.role === 'host') payload.state = createStateSnapshot();
         else payload.input = {
             keys: { w: Boolean(keys.w), a: Boolean(keys.a), s: Boolean(keys.s), d: Boolean(keys.d) },
+            sprint: sprintActive,
             actions,
             profile: readLocalProfile(currentRoom.playerId)
         };

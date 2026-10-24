@@ -191,6 +191,7 @@ class GameHandler(SimpleHTTPRequestHandler):
                 "token": token,
                 "last_seen": now,
                 "keys": {},
+                "sprint": False,
                 "actions": [],
                 "profile": self.clean_profile(payload.get("profile"), player_id),
             }
@@ -225,6 +226,7 @@ class GameHandler(SimpleHTTPRequestHandler):
                 for player_id, guest in connected_guests.items():
                     guest_inputs[str(player_id)] = {
                         "keys": guest["keys"],
+                        "sprint": guest["sprint"],
                         "actions": guest["actions"],
                     }
                     guest["actions"] = []
@@ -257,6 +259,7 @@ class GameHandler(SimpleHTTPRequestHandler):
                 input_state = payload.get("input", {})
                 if isinstance(input_state, dict):
                     guest["profile"] = self.clean_profile(input_state.get("profile"), player_id)
+                    guest["sprint"] = input_state.get("sprint") is True
                     candidate_keys = input_state.get("keys", {})
                     guest["keys"] = {
                         key: True for key in ("w", "a", "s", "d")
