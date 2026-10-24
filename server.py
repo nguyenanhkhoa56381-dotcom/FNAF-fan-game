@@ -54,10 +54,8 @@ class GameHandler(SimpleHTTPRequestHandler):
         origin = self.headers.get("Origin")
         if origin in cors_origins():
             self.send_header("Access-Control-Allow-Origin", origin)
-        self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(body)
-        self.close_connection = True
 
     def do_OPTIONS(self):
         origin = self.headers.get("Origin")
@@ -351,6 +349,12 @@ class GameHandler(SimpleHTTPRequestHandler):
 class GameHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = True
     daemon_threads = True
+    request_queue_size = 64
+
+    def get_request(self):
+        request, client_address = super().get_request()
+        request.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        return request, client_address
 
 
 def local_addresses():
